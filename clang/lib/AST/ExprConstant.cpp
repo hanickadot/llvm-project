@@ -4926,6 +4926,8 @@ enum EvalStmtResult {
   ESR_Failed,
   /// Hit a 'return' statement.
   ESR_Returned,
+  /// Hit a 'throw' statement.
+  ESR_ExceptionThrown,
   /// Evaluation succeeded.
   ESR_Succeeded,
   /// Hit a 'continue' statement.
@@ -5049,6 +5051,7 @@ static EvalStmtResult EvaluateLoopBody(StmtResult &Result, EvalInfo &Info,
     return ESR_Continue;
   case ESR_Failed:
   case ESR_Returned:
+  case ESR_ExceptionThrown:
   case ESR_CaseNotFound:
     return ESR;
   }
@@ -5123,6 +5126,7 @@ static EvalStmtResult EvaluateSwitch(StmtResult &Result, EvalInfo &Info,
   case ESR_Continue:
   case ESR_Failed:
   case ESR_Returned:
+  case ESR_ExceptionThrown:
     return ESR;
   case ESR_CaseNotFound:
     // This can only happen if the switch case is nested within a statement
@@ -5330,6 +5334,24 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
               : Evaluate(Result.Value, Info, RetExpr)))
       return ESR_Failed;
     return Scope.destroy() ? ESR_Returned : ESR_Failed;
+  }
+  
+  case Stmt::CXXThrowExprClass: {
+    const Expr *ThrowExpr = cast<CXXThrowExpr>(S)->getSubExpr();
+    // TODO throw where RetExpr is empty
+    FullExpressionRAII Scope(Info);
+    if (ThrowExpr && ThrowExpr->isValueDependent()) {
+      EvaluateDependentExpr(ThrowExpr, Info);
+      // We know we returned, but we don't know what the value is.
+      return ESR_Failed;
+    }
+    // TODO store into result expression slot
+    if (ThrowExpr &&
+        !(Result.Slot
+              ? EvaluateInPlace(Result.Value, Info, *Result.Slot, ThrowExpr)
+              : Evaluate(Result.Value, Info, ThrowExpr)))
+      return ESR_Failed;
+    return Scope.destroy() ? ESR_ExceptionThrown : ESR_Failed;
   }
 
   case Stmt::CompoundStmtClass: {
@@ -5615,8 +5637,21 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   case Stmt::DefaultStmtClass:
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
   case Stmt::CXXTryStmtClass:
-    // Evaluate try blocks by evaluating all sub statements.
-    return EvaluateStmt(Result, Info, cast<CXXTryStmt>(S)->getTryBlock(), Case);
+    const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
+    const EvalStmtResult result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
+    //// Evaluate try blocks by evaluating all sub statements.
+    if (result == ESR_ExceptionThrown) {
+      // TODO handle exception in return slot
+      // TODO match exception to catch blocks
+      // TODO match exception to ... catch block
+      for (const Stmt * catchHandler: tryStatement->children()) {
+        // TODO select right statement 
+        //return EvaluateStmt(Result, Info, catchStatement->getHandlerBlock(), Case);
+      }
+      // TODO return ESR_ExceptionThrown when no handler found
+      return ESR_Returned;
+    }
+    return result;
   }
 }
 
