@@ -5339,7 +5339,13 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   case Stmt::CXXThrowExprClass: {
     const Expr *ThrowExpr = cast<CXXThrowExpr>(S)->getSubExpr();
     // TODO throw where RetExpr is empty
+    // TODO store source location for exception
+    if (ThrowExpr == nullptr) {
+      return ESR_Returned; // TODO remove
+      // TODO use return slot, report error in case it's empty
+    }
     FullExpressionRAII Scope(Info);
+    
     if (ThrowExpr && ThrowExpr->isValueDependent()) {
       EvaluateDependentExpr(ThrowExpr, Info);
       // We know we returned, but we don't know what the value is.
@@ -5641,15 +5647,25 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     const EvalStmtResult result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
-      // TODO handle exception in return slot
-      // TODO match exception to catch blocks
-      // TODO match exception to ... catch block
-      for (const Stmt * catchHandler: tryStatement->children()) {
+      for (const Stmt * catchHandler: tryStatement->handlers()) {
+        const CXXCatchStmt * handler = cast<CXXCatchStmt>(catchHandler);
         // TODO select right statement 
-        //return EvaluateStmt(Result, Info, catchStatement->getHandlerBlock(), Case);
+        if (handler->getCaughtType().isNull()) {
+          // ... handler
+          
+        } else if (handler->getCaughtType(), true) {
+          // TODO match handler type against 
+          continue;
+        } else {
+          // non matching block
+          continue;
+        }
+        
+        // TODO handle exception in return slot
+        return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
       }
       // TODO return ESR_ExceptionThrown when no handler found
-      return ESR_Returned;
+      return ESR_ExceptionThrown;
     }
     return result;
   }

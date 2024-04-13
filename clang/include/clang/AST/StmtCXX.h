@@ -123,6 +123,15 @@ public:
   const_child_range children() const {
     return const_child_range(getStmts(), getStmts() + getNumHandlers() + 1);
   }
+  
+  child_range handlers() {
+    // +1 as first child statement is the try block itself
+    return child_range(getStmts() + 1, getStmts() + getNumHandlers() + 1);
+  }
+  
+  const_child_range handlers() const {
+    return const_child_range(getStmts() + 1, getStmts() + getNumHandlers() + 1);
+  }
 };
 
 /// CXXForRangeStmt - This represents C++0x [stmt.ranged]'s ranged for
