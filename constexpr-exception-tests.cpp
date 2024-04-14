@@ -62,6 +62,120 @@ constexpr int passing_result_of_expression(int a, int b) {
 
 static_assert(passing_result_of_expression(3,5) == 8);
 
+struct type1 {
+  constexpr int get_value() const noexcept {
+    return 1;
+  }
+};
+
+struct type2 {
+  constexpr int get_value() const noexcept {
+    return 2;
+  }
+};
+
+constexpr int complex_type_A() {
+  try {
+    throw type1();
+    return -1;
+  } catch (type1) {
+    return 1;
+  } catch (type2) {
+    return 2;
+  }
+  return 3;
+}
+
+constexpr int complex_type_B() {
+  try {
+    throw type1();
+    return -1;
+  } catch (type2) {
+    return 2;
+  } catch (type1) {
+    return 1;
+  }
+  return 3;
+}
+
+static_assert(complex_type_A() == 1);
+static_assert(complex_type_B() == 1);
+
+template <int I> struct typeN {
+  constexpr int get_value() const noexcept {
+    return I;
+  }
+};
+
+constexpr int templated_type() {
+  try {
+    throw typeN<0>();
+    return -1;
+  } catch (type1) {
+    return 1;
+  } catch (type2) {
+    return 2;
+  } catch (...) {
+    return 0;
+  }
+}
+
+static_assert(templated_type() == 0);
+
+constexpr int templated_type_catched() {
+  try {
+    throw typeN<0>();
+    return -1;
+  } catch (typeN<0>) {
+    return 1;
+  } catch (type2) {
+    return 2;
+  } catch (...) {
+    return 0;
+  }
+}
+
+static_assert(templated_type_catched() == 1);
+
+
+//constexpr int templated_type_catched_without_catchall() {
+//  try {
+//    throw typeN<0>();
+//    return -1;
+//  } catch (typeN<0>) {
+//    return 1;
+//  } catch (type2) {
+//    return 2;
+//  }
+//  return 3;
+//}
+
+//static_assert(templated_type_catched_without_catchall() == 1);
+
+//constexpr int different_types_thowing(int t) {
+//  try {
+//    if (t == 0) {
+//      throw type<0>();
+//    } else if (t == 1) {
+//      throw type<1>();
+//    } else {
+//      throw type<2>();
+//    }
+//    return -1;
+//  } catch (type<0> a) {
+//    return a.get_value();
+//  } catch (type<1> a) {
+//    return a.get_value();
+//  } catch (type<2> a) {
+//    return a.get_value();
+//  }
+//}
+//
+//static_assert(different_types_thowing(0) == 0);
+//static_assert(different_types_thowing(1) == 1);
+//static_assert(different_types_thowing(2) == 2);
+
+
 //constexpr int passing_reference_to_exception() {
 //  try {
 //    throw 21;

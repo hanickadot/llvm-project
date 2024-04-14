@@ -5016,6 +5016,7 @@ struct StmtResult {
   const LValue *Slot;
   /// The APValue for throws exception
   APValue &Exception;
+  QualType ExceptionType{};
 };
 
 struct TempVersionRAII {
@@ -5351,6 +5352,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       return ESR_Failed;
     }
     if (ThrowExpr) {
+      Result.ExceptionType = ThrowExpr->getType();
       if (!Evaluate(Result.Exception, Info, ThrowExpr)) 
         return ESR_Failed;
     } else {
@@ -5648,24 +5650,29 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     const EvalStmtResult result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
+      const QualType ExceptionType = Result.ExceptionType;
       for (const Stmt * catchHandler: tryStatement->handlers()) {
-        const CXXCatchStmt * handler = cast<CXXCatchStmt>(catchHandler);
+        const CXXCatchStmt * Handler = cast<CXXCatchStmt>(catchHandler);
         // TODO select right statement 
-        if (handler->getCaughtType().isNull()) {
-          // catch (...) { ... }
-          return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
+        const QualType HandlerType = Handler->getCaughtType();
+        
+        if (!HandlerType.isNull()) {
+          if (HandlerType != ExceptionType) {
+            continue;
+          }
+          // TODO check if we can attach exception to exceptionVariable
+          [[maybe_unused]] const VarDecl * exceptionVariableDecl = Handler->getExceptionDecl();
+          assert(exceptionVariableDecl->isExceptionVariable());
+          LValue ResultLValue;
+          APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
+          Val = std::move(Result.Exception);
+        
+          //EvaluateVarDecl(Info, exceptionVariableDecl);
+          // TODO check if `type` matches exception in `ExceptionSlot`
         } 
         
-        // TODO check if we can attach exception to exceptionVariable
-        [[maybe_unused]] const VarDecl * exceptionVariableDecl = handler->getExceptionDecl();
-        assert(exceptionVariableDecl->isExceptionVariable());
-        LValue ResultLValue;
-        APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
-        Val = std::move(Result.Exception);
         
-        //EvaluateVarDecl(Info, exceptionVariableDecl);
-        // TODO check if `type` matches exception in `ExceptionSlot`
-        return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
+        return EvaluateStmt(Result, Info, Handler->getHandlerBlock(), Case);
         continue;
       }
       return ESR_ExceptionThrown;
