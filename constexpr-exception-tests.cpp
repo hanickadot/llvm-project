@@ -146,3 +146,22 @@ static_assert(weird_switch(0) == 41);
 static_assert(weird_switch(1) == 42);
 static_assert(weird_switch(2) == 43);
 
+constexpr int * with_allocation(int v) {
+  try {
+    throw new int{v};
+  } catch (int * ptr) {
+    return ptr;
+  }
+}
+
+constexpr int result_from_allocation(int v) {
+  const int * ptr = with_allocation(v);
+  int r = *ptr;
+  delete ptr;
+  return r;
+}
+
+static_assert(result_from_allocation(1) == 1);
+static_assert(result_from_allocation(2) == 2);
+static_assert(result_from_allocation(3) == 3);
+
