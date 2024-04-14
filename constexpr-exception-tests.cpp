@@ -96,7 +96,7 @@ constexpr int rethrowing_without_name(int i) {
     throw i;
   } catch (...) {
     try {
-      throw i;
+      throw;
     } catch (int j) {
       return j;
     }
