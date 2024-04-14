@@ -5657,10 +5657,16 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
         } 
         
-        auto type = handler->getCaughtType();
+        // TODO check if we can attach exception to exceptionVariable
         [[maybe_unused]] const VarDecl * exceptionVariableDecl = handler->getExceptionDecl();
-        // TODO check if `type` matches exception in `ExceptionSlot`
         
+        LValue ResultLValue;
+        APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
+        Val = std::move(Result.Exception);
+        
+        //EvaluateVarDecl(Info, exceptionVariableDecl);
+        // TODO check if `type` matches exception in `ExceptionSlot`
+        return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
         continue;
       }
       return ESR_ExceptionThrown;
