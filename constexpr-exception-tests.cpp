@@ -165,3 +165,21 @@ static_assert(result_from_allocation(1) == 1);
 static_assert(result_from_allocation(2) == 2);
 static_assert(result_from_allocation(3) == 3);
 
+struct complex_object {
+  int a;
+  int b;
+  int c;
+};
+
+constexpr auto throwing_complex_object() {
+  try {
+    throw complex_object{1,2,3};
+  } catch (complex_object obj) {
+    return obj;
+  }
+}
+
+static_assert(throwing_complex_object().a == 1);
+static_assert(throwing_complex_object().b == 2);
+static_assert(throwing_complex_object().c == 3);
+
