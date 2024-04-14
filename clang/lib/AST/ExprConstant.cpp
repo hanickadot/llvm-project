@@ -5357,7 +5357,6 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       if (Result.Exception.isAbsent())
         return ESR_Failed;
     }
-    std::cout << "throwing exception...\n";
     return Scope.destroy() ? ESR_ExceptionThrown : ESR_Failed;
   }
 
@@ -5659,7 +5658,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         
         // TODO check if we can attach exception to exceptionVariable
         [[maybe_unused]] const VarDecl * exceptionVariableDecl = handler->getExceptionDecl();
-        
+        assert(exceptionVariableDecl->isExceptionVariable());
         LValue ResultLValue;
         APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
         Val = std::move(Result.Exception);
@@ -8155,8 +8154,6 @@ public:
     const FunctionDecl *Definition = nullptr;
     Stmt *Body = FD->getBody(Definition);
 
-    std::cout << "Calling...\n";
-    
     if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body) ||
         !HandleFunctionCall(E->getExprLoc(), Definition, This, E, Args, Call,
                             Body, Info, Result, ResultSlot))
