@@ -5651,25 +5651,30 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
       const QualType ExceptionType = Result.ExceptionType;
+      //std::cout << "\nCatching exception...\n";
       for (const Stmt * catchHandler: tryStatement->handlers()) {
         const CXXCatchStmt * Handler = cast<CXXCatchStmt>(catchHandler);
         // TODO select right statement 
         const QualType HandlerType = Handler->getCaughtType();
         
         if (!HandlerType.isNull()) {
-          if (HandlerType != ExceptionType) {
+          // TODO ability to attach value to reference
+          //std::cout << "handler = " << HandlerType.getUnqualifiedType().getAsString() << " vs " << ExceptionType.getUnqualifiedType().getAsString() << "\n";
+          //HandlerType.dump();
+          //ExceptionType.dump();
+          // TODO use better comparison (it's shameful I'm using strings now :)
+          if (HandlerType.getUnqualifiedType().getAsString() != ExceptionType.getUnqualifiedType().getAsString()) {
             continue;
           }
-          // TODO check if we can attach exception to exceptionVariable
-          [[maybe_unused]] const VarDecl * exceptionVariableDecl = Handler->getExceptionDecl();
+          
+          const VarDecl * exceptionVariableDecl = Handler->getExceptionDecl();
           assert(exceptionVariableDecl->isExceptionVariable());
           LValue ResultLValue;
           APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
           Val = std::move(Result.Exception);
-        
-          //EvaluateVarDecl(Info, exceptionVariableDecl);
-          // TODO check if `type` matches exception in `ExceptionSlot`
-        } 
+        } else {
+          //std::cout << "handler = ... vs " << ExceptionType.getAsString() << "\n";
+        }
         
         
         return EvaluateStmt(Result, Info, Handler->getHandlerBlock(), Case);

@@ -124,9 +124,9 @@ static_assert(templated_type() == 0);
 
 constexpr int templated_type_catched() {
   try {
-    throw typeN<0>();
+    throw typeN<42>();
     return -1;
-  } catch (typeN<0>) {
+  } catch (typeN<42>) {
     return 1;
   } catch (type2) {
     return 2;
@@ -138,57 +138,57 @@ constexpr int templated_type_catched() {
 static_assert(templated_type_catched() == 1);
 
 
-//constexpr int templated_type_catched_without_catchall() {
-//  try {
-//    throw typeN<0>();
-//    return -1;
-//  } catch (typeN<0>) {
-//    return 1;
-//  } catch (type2) {
-//    return 2;
-//  }
-//  return 3;
-//}
+constexpr int templated_type_catched_without_catchall() {
+  try {
+    throw typeN<0>();
+    return -1;
+  } catch (typeN<0>) {
+    return 1;
+  } catch (type2) {
+    return 2;
+  }
+  return 3;
+}
 
-//static_assert(templated_type_catched_without_catchall() == 1);
+static_assert(templated_type_catched_without_catchall() == 1);
 
-//constexpr int different_types_thowing(int t) {
-//  try {
-//    if (t == 0) {
-//      throw type<0>();
-//    } else if (t == 1) {
-//      throw type<1>();
-//    } else {
-//      throw type<2>();
-//    }
-//    return -1;
-//  } catch (type<0> a) {
-//    return a.get_value();
-//  } catch (type<1> a) {
-//    return a.get_value();
-//  } catch (type<2> a) {
-//    return a.get_value();
-//  }
-//}
-//
-//static_assert(different_types_thowing(0) == 0);
-//static_assert(different_types_thowing(1) == 1);
-//static_assert(different_types_thowing(2) == 2);
+constexpr int different_types_thowing(int t) {
+  try {
+    if (t == 0) {
+      throw typeN<0>();
+    } else if (t == 1) {
+      throw typeN<1>();
+    } else {
+      throw typeN<2>();
+    }
+    return -1;
+  } catch (typeN<0> a) {
+    return a.get_value();
+  } catch (typeN<1> a) {
+    return a.get_value();
+  } catch (typeN<2> a) {
+    return a.get_value();
+  }
+}
+
+static_assert(different_types_thowing(0) == 0);
+static_assert(different_types_thowing(1) == 1);
+static_assert(different_types_thowing(2) == 2);
 
 
-//constexpr int passing_reference_to_exception() {
-//  try {
-//    throw 21;
-//    return 1;
-//  } catch (const int & i) {
-//    return i;
-//  } catch (...) {
-//    return 3;
-//  }
-//  return 4;
-//}
+constexpr int passing_reference_to_exception() {
+  try {
+    throw 21;
+    return 1;
+  } catch (const int & i) {
+    return i;
+  } catch (...) {
+    return 3;
+  }
+  return 4;
+}
 
-//static_assert(passing_reference_to_exception() == 21);
+static_assert(passing_reference_to_exception() == 21);
 
 constexpr int rethrowing(int i) {
   try {
