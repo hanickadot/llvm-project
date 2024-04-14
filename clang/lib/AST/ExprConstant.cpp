@@ -63,6 +63,7 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <iostream>
 
 #define DEBUG_TYPE "exprconstant"
 
@@ -5013,6 +5014,8 @@ struct StmtResult {
   APValue &Value;
   /// The location containing the result, if any (used to support RVO).
   const LValue *Slot;
+  /// The APValue for throws exception
+  APValue &Exception;
 };
 
 struct TempVersionRAII {
@@ -5338,25 +5341,23 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   
   case Stmt::CXXThrowExprClass: {
     const Expr *ThrowExpr = cast<CXXThrowExpr>(S)->getSubExpr();
-    // TODO throw where RetExpr is empty
     // TODO store source location for exception
-    if (ThrowExpr == nullptr) {
-      return ESR_Returned; // TODO remove
-      // TODO use return slot, report error in case it's empty
-    }
     FullExpressionRAII Scope(Info);
     
+    // TODO check if we need this?
     if (ThrowExpr && ThrowExpr->isValueDependent()) {
       EvaluateDependentExpr(ThrowExpr, Info);
       // We know we returned, but we don't know what the value is.
       return ESR_Failed;
     }
-    // TODO store into result expression slot
-    if (ThrowExpr &&
-        !(Result.Slot
-              ? EvaluateInPlace(Result.Value, Info, *Result.Slot, ThrowExpr)
-              : Evaluate(Result.Value, Info, ThrowExpr)))
-      return ESR_Failed;
+    if (ThrowExpr) {
+      if (!Evaluate(Result.Exception, Info, ThrowExpr)) 
+        return ESR_Failed;
+    } else {
+      if (Result.Exception.isAbsent())
+        return ESR_Failed;
+    }
+    std::cout << "throwing exception...\n";
     return Scope.destroy() ? ESR_ExceptionThrown : ESR_Failed;
   }
 
@@ -5644,6 +5645,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
   case Stmt::CXXTryStmtClass:
     const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
+    // provide local exception slot
     const EvalStmtResult result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
@@ -5651,20 +5653,16 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         const CXXCatchStmt * handler = cast<CXXCatchStmt>(catchHandler);
         // TODO select right statement 
         if (handler->getCaughtType().isNull()) {
-          // ... handler
-          
-        } else if (handler->getCaughtType(), true) {
-          // TODO match handler type against 
-          continue;
-        } else {
-          // non matching block
-          continue;
-        }
+          // catch (...) { ... }
+          return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
+        } 
         
-        // TODO handle exception in return slot
-        return EvaluateStmt(Result, Info, handler->getHandlerBlock(), Case);
+        auto type = handler->getCaughtType();
+        [[maybe_unused]] const VarDecl * exceptionVariableDecl = handler->getExceptionDecl();
+        // TODO check if `type` matches exception in `ExceptionSlot`
+        
+        continue;
       }
-      // TODO return ESR_ExceptionThrown when no handler found
       return ESR_ExceptionThrown;
     }
     return result;
@@ -6386,14 +6384,15 @@ static bool HandleFunctionCall(SourceLocation CallLoc,
                                         Frame.LambdaThisCaptureField);
   }
 
-  StmtResult Ret = {Result, ResultSlot};
+  // TODO use Exception slot instead of second result
+  StmtResult Ret = {Result, ResultSlot, Result};
   EvalStmtResult ESR = EvaluateStmt(Ret, Info, Body);
   if (ESR == ESR_Succeeded) {
     if (Callee->getReturnType()->isVoidType())
       return true;
     Info.FFDiag(Callee->getEndLoc(), diag::note_constexpr_no_return);
   }
-  return ESR == ESR_Returned;
+  return ESR == ESR_Returned || ESR == ESR_ExceptionThrown;
 }
 
 /// Evaluate a constructor call.
@@ -6420,7 +6419,8 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
   // FIXME: Creating an APValue just to hold a nonexistent return value is
   // wasteful.
   APValue RetVal;
-  StmtResult Ret = {RetVal, nullptr};
+  APValue Exception;
+  StmtResult Ret = {RetVal, nullptr, Exception};
 
   // If it's a delegating constructor, delegate.
   if (Definition->isDelegatingConstructor()) {
@@ -6745,7 +6745,8 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
   // FIXME: Creating an APValue just to hold a nonexistent return value is
   // wasteful.
   APValue RetVal;
-  StmtResult Ret = {RetVal, nullptr};
+  APValue Exception;
+  StmtResult Ret = {RetVal, nullptr, Exception};
   if (EvaluateStmt(Ret, Info, Definition->getBody()) == ESR_Failed)
     return false;
 
@@ -8148,6 +8149,8 @@ public:
     const FunctionDecl *Definition = nullptr;
     Stmt *Body = FD->getBody(Definition);
 
+    std::cout << "Calling...\n";
+    
     if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body) ||
         !HandleFunctionCall(E->getExprLoc(), Definition, This, E, Args, Call,
                             Body, Info, Result, ResultSlot))
@@ -8331,7 +8334,8 @@ public:
       }
 
       APValue ReturnValue;
-      StmtResult Result = { ReturnValue, nullptr };
+      APValue Exception;
+      StmtResult Result = { ReturnValue, nullptr, Exception };
       EvalStmtResult ESR = EvaluateStmt(Result, Info, *BI);
       if (ESR != ESR_Succeeded) {
         // FIXME: If the statement-expression terminated due to 'return',
