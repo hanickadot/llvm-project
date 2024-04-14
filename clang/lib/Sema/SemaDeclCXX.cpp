@@ -2109,6 +2109,7 @@ static bool CheckConstexprCtorInitializer(Sema &SemaRef,
 static bool
 CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
                            SmallVectorImpl<SourceLocation> &ReturnStmts,
+                           SmallVectorImpl<SourceLocation> &ThrowStmts,
                            SourceLocation &Cxx1yLoc, SourceLocation &Cxx2aLoc,
                            SourceLocation &Cxx2bLoc,
                            Sema::CheckConstexprKind Kind) {
@@ -2139,12 +2140,17 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
 
     ReturnStmts.push_back(S->getBeginLoc());
     return true;
+  
+  case Stmt::CXXThrowExprClass:
+    //   - and exactly one return statement;
+    ThrowStmts.push_back(S->getBeginLoc());
+    return true;
 
   case Stmt::AttributedStmtClass:
     // Attributes on a statement don't affect its formal kind and hence don't
     // affect its validity in a constexpr function.
     return CheckConstexprFunctionStmt(
-        SemaRef, Dcl, cast<AttributedStmt>(S)->getSubStmt(), ReturnStmts,
+        SemaRef, Dcl, cast<AttributedStmt>(S)->getSubStmt(), ReturnStmts, ThrowStmts,
         Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind);
 
   case Stmt::CompoundStmtClass: {
@@ -2154,7 +2160,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
 
     CompoundStmt *CompStmt = cast<CompoundStmt>(S);
     for (auto *BodyIt : CompStmt->body()) {
-      if (!CheckConstexprFunctionStmt(SemaRef, Dcl, BodyIt, ReturnStmts,
+      if (!CheckConstexprFunctionStmt(SemaRef, Dcl, BodyIt, ReturnStmts, ThrowStmts,
                                       Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
     }
@@ -2167,11 +2173,11 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       Cxx1yLoc = S->getBeginLoc();
 
     IfStmt *If = cast<IfStmt>(S);
-    if (!CheckConstexprFunctionStmt(SemaRef, Dcl, If->getThen(), ReturnStmts,
+    if (!CheckConstexprFunctionStmt(SemaRef, Dcl, If->getThen(), ReturnStmts, ThrowStmts,
                                     Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
       return false;
     if (If->getElse() &&
-        !CheckConstexprFunctionStmt(SemaRef, Dcl, If->getElse(), ReturnStmts,
+        !CheckConstexprFunctionStmt(SemaRef, Dcl, If->getElse(), ReturnStmts, ThrowStmts,
                                     Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
       return false;
     return true;
@@ -2190,7 +2196,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       Cxx1yLoc = S->getBeginLoc();
     for (Stmt *SubStmt : S->children()) {
       if (SubStmt &&
-          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts,
+          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts, ThrowStmts,
                                       Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
     }
@@ -2206,7 +2212,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       Cxx1yLoc = S->getBeginLoc();
     for (Stmt *SubStmt : S->children()) {
       if (SubStmt &&
-          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts,
+          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts, ThrowStmts,
                                       Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
     }
@@ -2218,7 +2224,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       Cxx2bLoc = S->getBeginLoc();
     for (Stmt *SubStmt : S->children()) {
       if (SubStmt &&
-          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts,
+          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts, ThrowStmts,
                                       Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
     }
@@ -2232,7 +2238,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       Cxx2aLoc = S->getBeginLoc();
     for (Stmt *SubStmt : S->children()) {
       if (SubStmt &&
-          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts,
+          !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts, ThrowStmts,
                                       Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
     }
@@ -2242,7 +2248,7 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
     // Do not bother checking the language mode (already covered by the
     // try block check).
     if (!CheckConstexprFunctionStmt(
-            SemaRef, Dcl, cast<CXXCatchStmt>(S)->getHandlerBlock(), ReturnStmts,
+            SemaRef, Dcl, cast<CXXCatchStmt>(S)->getHandlerBlock(), ReturnStmts, ThrowStmts,
             Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
       return false;
     return true;
@@ -2273,7 +2279,8 @@ static bool CheckConstexprFunctionBody(Sema &SemaRef, const FunctionDecl *Dcl,
                                        Stmt *Body,
                                        Sema::CheckConstexprKind Kind) {
   SmallVector<SourceLocation, 4> ReturnStmts;
-
+  SmallVector<SourceLocation, 4> ThrowStmts;
+  
   if (isa<CXXTryStmt>(Body)) {
     // C++11 [dcl.constexpr]p3:
     //  The definition of a constexpr function shall satisfy the following
@@ -2311,7 +2318,7 @@ static bool CheckConstexprFunctionBody(Sema &SemaRef, const FunctionDecl *Dcl,
   SourceLocation Cxx1yLoc, Cxx2aLoc, Cxx2bLoc;
   for (Stmt *SubStmt : Body->children()) {
     if (SubStmt &&
-        !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts,
+        !CheckConstexprFunctionStmt(SemaRef, Dcl, SubStmt, ReturnStmts, ThrowStmts,
                                     Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
       return false;
   }
@@ -2405,7 +2412,7 @@ static bool CheckConstexprFunctionBody(Sema &SemaRef, const FunctionDecl *Dcl,
       }
     }
   } else {
-    if (ReturnStmts.empty()) {
+    if (ReturnStmts.empty() && ThrowStmts.empty()) {
       // C++1y doesn't require constexpr functions to contain a 'return'
       // statement. We still do, unless the return type might be void, because
       // otherwise if there's no return statement, the function cannot
