@@ -1897,7 +1897,7 @@ static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
 
 /// Check if provided catch-handler is able to process exception of type
                                // TODO provide arguments
-static bool IsCompatibleCatchHandler(const CXXCatchStmt * Handler, const QualType ExceptionType);
+static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType ExceptionType);
 
 //===----------------------------------------------------------------------===//
 // Misc utilities
@@ -5655,31 +5655,47 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
       const QualType ExceptionType = Result.ExceptionType;
-      //std::cout << "\nCatching exception...\n";
+      std::cout << "\nCatching exception...\n";
       for (const Stmt * catchHandler: tryStatement->handlers()) {
-        const CXXCatchStmt * Handler = cast<CXXCatchStmt>(catchHandler);
-          
-        // TODO finish it
+        std::cout << " * ";
+        const CXXCatchStmt * Catch = cast<CXXCatchStmt>(catchHandler);
+        
+        // handle catch(...) right now
+        if (!Catch->getExceptionDecl()) {
+          std::cout << "catch(...)\n";
+          return EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
+        }
+        
+        const auto * CaughtType = Catch->getCaughtType()->getUnqualifiedDesugaredType();
+        if (CaughtType->isReferenceType()) {
+           CaughtType = CaughtType->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
+        }
+        
         // skip incompatible handles...
-        if (!IsCompatibleCatchHandler(Handler, ExceptionType)) {
+        if (!IsCompatibleCatchHandler(CaughtType, ExceptionType)) {
           continue;
         }
         
-        // catch(...) handler is not initializing any variable
-        if (!Handler->getCaughtType().isNull()) {
-          // TODO provide exception to handler variable
-          const VarDecl * exceptionVariableDecl = Handler->getExceptionDecl();
-          assert(exceptionVariableDecl->isExceptionVariable());
-          
-          // declare the variable
-          LValue ResultLValue;
-          APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
-          Val = std::move(Result.Exception);
-        }
+        std::cout << Catch->getCaughtType().getAsString() << " vs exc = " << ExceptionType.getAsString() << "\n";
         
-        return EvaluateStmt(Result, Info, Handler->getHandlerBlock(), Case);
-        continue;
+        // create scope for variable to store/bind the exception
+        FullExpressionRAII Scope(Info);
+        
+        // FIXME: do it properly
+        const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
+        assert(exceptionVariableDecl->isExceptionVariable());
+        
+        // FIXME: declare the variable
+        LValue ResultLValue;
+        APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
+        //ResultLValue.setFrom(Info.Ctx, Result.Exception);
+        Val = std::move(Result.Exception);
+        
+        // and evaluate the handler
+        return EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
       }
+      // TODO rethrow 
+      std::cout << " (not caught)\n";
       return ESR_ExceptionThrown;
     }
     return result;
@@ -11640,19 +11656,72 @@ static bool EvaluateFixedPointOrInteger(const Expr *E, APFixedPoint &Result,
 }
 
 // TODO provide definition
-static bool IsCompatibleCatchHandler(const CXXCatchStmt * Handler, const QualType ExceptionType)
+static bool isUnambiguousPublicBaseClass(const Type *DerivedType,
+                                  const Type *BaseType) {
+  const auto *DerivedClass =
+      DerivedType->getCanonicalTypeUnqualified()->getAsCXXRecordDecl();
+  const auto *BaseClass =
+      BaseType->getCanonicalTypeUnqualified()->getAsCXXRecordDecl();
+  if (!DerivedClass || !BaseClass)
+    return false;
+
+  CXXBasePaths Paths;
+  Paths.setOrigin(DerivedClass);
+
+  bool IsPublicBaseClass = false;
+  DerivedClass->lookupInBases(
+      [&BaseClass, &IsPublicBaseClass](const CXXBaseSpecifier *BS,
+                                       CXXBasePath &) {
+        if (BS->getType()
+                    ->getCanonicalTypeUnqualified()
+                    ->getAsCXXRecordDecl() == BaseClass &&
+            BS->getAccessSpecifier() == AS_public) {
+          IsPublicBaseClass = true;
+          return true;
+        }
+
+        return false;
+      },
+      Paths);
+
+  return !Paths.isAmbiguous(BaseType->getCanonicalTypeUnqualified()) &&
+         IsPublicBaseClass;
+}
+
+static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception)
 {
-  const QualType HandlerType = Handler->getCaughtType();
+  const Type * ExceptionTy = Exception.getTypePtrOrNull();
   
-  if (HandlerType.isNull()) {
+  assert(HandlerTy != nullptr);
+  assert(ExceptionTy != nullptr);
+  
+  const CanQualType HandlerCanTy = HandlerTy->getCanonicalTypeUnqualified();
+  const CanQualType ExceptionCanTy = ExceptionTy->getCanonicalTypeUnqualified();
+  
+  // The handler is of type cv T or cv T& and E and T are the same type
+  // (ignoring the top-level cv-qualifiers) ...
+  if (ExceptionCanTy == HandlerCanTy) {
+    std::cout << "E == T (ignoring top level cv-qualifier)\n";
     return true;
   }
   
-  if (HandlerType.getUnqualifiedType().getAsString() != ExceptionType.getUnqualifiedType().getAsString()) {
+  // The handler is of type cv T or cv T& and T is an unambiguous public base
+  // class of E ...
+  if (isUnambiguousPublicBaseClass(ExceptionCanTy->getTypePtr(), HandlerCanTy->getTypePtr())) {
+    std::cout << "isUnambiguousPublicBaseClass\n";
+    return true;
+  }
+  
+  if (HandlerCanTy->getTypeClass() == Type::RValueReference || (HandlerCanTy->getTypeClass() == Type::LValueReference && !HandlerCanTy->getTypePtr()->getPointeeType().isConstQualified())) {
+    std::cout << "[R-value reference or non-const L-value reference]";
     return false;
   }
   
-  return true;
+  // TODO implement remainder
+  
+  
+  std::cout << "[" << QualType(HandlerTy,0).getAsString() << " vs " << QualType(ExceptionTy,0).getAsString() << "]";
+  return false;
 }
 
 /// Check whether the given declaration can be directly converted to an integral

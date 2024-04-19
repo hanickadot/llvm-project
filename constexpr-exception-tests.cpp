@@ -208,7 +208,7 @@ constexpr int passing_reference_to_exception() {
   return 4;
 }
 
-static_assert(passing_reference_to_exception() == 21);
+static_assert(passing_reference_to_exception() == 21); // FAILING
 
 constexpr int rethrowing(int i) {
   try {
@@ -330,7 +330,7 @@ constexpr int throwing_reference_matches_first_a(const int & r) {
   return 3;
 }
 
-static_assert(throwing_reference_matches_first_a(1) == 1);
+static_assert(throwing_reference_matches_first_a(1) == 1); /// FAILING
 
 constexpr int throwing_reference_matches_first_b(const int & r) {
   try {
@@ -344,3 +344,24 @@ constexpr int throwing_reference_matches_first_b(const int & r) {
 }
 
 static_assert(throwing_reference_matches_first_b(1) == 2);
+
+struct base {
+  
+};
+
+struct child: base {
+
+};
+
+constexpr int throw_child() {
+  try {
+    throw child{};
+  } catch (const base &) {
+    return 1;
+  } catch (...) {
+    return 2;
+  }
+  return 3;
+}
+
+static_assert(throw_child() == 1); /// FAILING
