@@ -1,3 +1,23 @@
+struct sink { };
+
+constexpr bool operator==(sink, sink) {
+  return false;
+}
+
+template <typename T> struct type_of_t {
+  constexpr friend bool operator==(type_of_t<T>, type_of_t<T>) {
+    return true;
+  }
+  constexpr explicit(false) operator sink() const noexcept {
+    return {};
+  }
+};
+
+template <typename T> constexpr auto type = type_of_t<T>{};
+template <auto V> constexpr auto type_of = type_of_t<decltype(V)>{};
+
+// TEST CODE STARTS HERE
+
 constexpr int expression_with_only_throw() {
   throw 42;
 }
@@ -293,7 +313,34 @@ constexpr auto throwing_complex_object() {
   }
 }
 
+
+static_assert(type_of<throwing_complex_object()> == type<complex_object>);
 static_assert(throwing_complex_object().a == 1);
 static_assert(throwing_complex_object().b == 2);
 static_assert(throwing_complex_object().c == 3);
 
+constexpr int throwing_reference_matches_first_a(const int & r) {
+  try {
+    throw r;
+  } catch (const int & a) {
+    return 1;
+  } catch (int b) {
+    return 2;
+  }
+  return 3;
+}
+
+static_assert(throwing_reference_matches_first_a(1) == 1);
+
+constexpr int throwing_reference_matches_first_b(const int & r) {
+  try {
+    throw r;
+  } catch (int b) {
+    return 2;
+  } catch (const int & a) {
+    return 1;
+  }
+  return 3;
+}
+
+static_assert(throwing_reference_matches_first_b(1) == 2);

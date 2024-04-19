@@ -1895,6 +1895,10 @@ static bool EvaluateFixedPointOrInteger(const Expr *E, APFixedPoint &Result,
 static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
                                EvalInfo &Info);
 
+/// Check if provided catch-handler is able to process exception of type
+                               // TODO provide arguments
+static bool IsCompatibleCatchHandler(const CXXCatchStmt * Handler, const QualType ExceptionType);
+
 //===----------------------------------------------------------------------===//
 // Misc utilities
 //===----------------------------------------------------------------------===//
@@ -5654,28 +5658,24 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       //std::cout << "\nCatching exception...\n";
       for (const Stmt * catchHandler: tryStatement->handlers()) {
         const CXXCatchStmt * Handler = cast<CXXCatchStmt>(catchHandler);
-        // TODO select right statement 
-        const QualType HandlerType = Handler->getCaughtType();
-        
-        if (!HandlerType.isNull()) {
-          // TODO ability to attach value to reference
-          //std::cout << "handler = " << HandlerType.getUnqualifiedType().getAsString() << " vs " << ExceptionType.getUnqualifiedType().getAsString() << "\n";
-          //HandlerType.dump();
-          //ExceptionType.dump();
-          // TODO use better comparison (it's shameful I'm using strings now :)
-          if (HandlerType.getUnqualifiedType().getAsString() != ExceptionType.getUnqualifiedType().getAsString()) {
-            continue;
-          }
           
+        // TODO finish it
+        // skip incompatible handles...
+        if (!IsCompatibleCatchHandler(Handler, ExceptionType)) {
+          continue;
+        }
+        
+        // catch(...) handler is not initializing any variable
+        if (!Handler->getCaughtType().isNull()) {
+          // TODO provide exception to handler variable
           const VarDecl * exceptionVariableDecl = Handler->getExceptionDecl();
           assert(exceptionVariableDecl->isExceptionVariable());
+          
+          // declare the variable
           LValue ResultLValue;
           APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
           Val = std::move(Result.Exception);
-        } else {
-          //std::cout << "handler = ... vs " << ExceptionType.getAsString() << "\n";
         }
-        
         
         return EvaluateStmt(Result, Info, Handler->getHandlerBlock(), Case);
         continue;
@@ -11637,6 +11637,22 @@ static bool EvaluateFixedPointOrInteger(const Expr *E, APFixedPoint &Result,
     return EvaluateFixedPoint(E, Result, Info);
   }
   return false;
+}
+
+// TODO provide definition
+static bool IsCompatibleCatchHandler(const CXXCatchStmt * Handler, const QualType ExceptionType)
+{
+  const QualType HandlerType = Handler->getCaughtType();
+  
+  if (HandlerType.isNull()) {
+    return true;
+  }
+  
+  if (HandlerType.getUnqualifiedType().getAsString() != ExceptionType.getUnqualifiedType().getAsString()) {
+    return false;
+  }
+  
+  return true;
 }
 
 /// Check whether the given declaration can be directly converted to an integral
