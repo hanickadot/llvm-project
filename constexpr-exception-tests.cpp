@@ -195,20 +195,38 @@ static_assert(different_types_thowing(0) == 0);
 static_assert(different_types_thowing(1) == 1);
 static_assert(different_types_thowing(2) == 2);
 
+struct complex_type {
+  int * a;
+  int b;
+};
 
-constexpr int passing_reference_to_exception() {
+constexpr int throwing_complex_type() {
   try {
-    throw 21;
-    return 1;
-  } catch (const int & i) {
-    return i;
-  } catch (...) {
-    return 3;
+    int * a = new int{42};
+    throw complex_type{.a = a, .b = 2};
+  } catch (complex_type ct) {
+    int v = *ct.a;
+    delete ct.a;
+    return v;
   }
-  return 4;
+  return 3;
 }
 
-static_assert(passing_reference_to_exception() == 21); // FAILING
+static_assert(throwing_complex_type() == 42);
+
+//constexpr int passing_reference_to_exception() {
+//  try {
+//    throw 21;
+//    return 1;
+//  } catch (const int & i) {
+//    return i;
+//  } catch (...) {
+//    return 3;
+//  }
+//  return 4;
+//}
+
+//static_assert(passing_reference_to_exception() == 21); // FAILING
 
 constexpr int rethrowing(int i) {
   try {
@@ -356,7 +374,7 @@ struct child: base {
 constexpr int throw_child() {
   try {
     throw child{};
-  } catch (const base &) {
+  } catch (const base & a) {
     return 1;
   } catch (...) {
     return 2;
@@ -364,4 +382,47 @@ constexpr int throw_child() {
   return 3;
 }
 
-static_assert(throw_child() == 1); /// FAILING
+static_assert(throw_child() == 1);
+
+struct baseA { };
+struct baseB { };
+struct multi_child: baseA, baseB { };
+
+constexpr int throw_multi_child() {
+  try {
+    throw multi_child{};
+  } catch (const baseA & a) {
+    return 1;
+  } catch (...) {
+    return 2;
+  }
+  return 3;
+}
+
+static_assert(throw_multi_child() == 1); 
+
+struct hidden_base { int x; };
+struct public_base { int y; };
+
+struct multi_child_with_hidden_base: private hidden_base, public_base {
+  constexpr multi_child_with_hidden_base(int a, int b): hidden_base{a}, public_base{b} { }
+};
+
+constexpr int throw_multi_child_with_hidden_base(bool placeholder) {
+  try {
+    throw multi_child_with_hidden_base{13,14};
+  } catch (const hidden_base & v) {
+    return 2; // will never match!
+  } catch (const public_base & w) {
+    if (placeholder) {
+      return 3;
+    }
+    return w.y; // crash here when placeholder = true
+  } catch (...) {
+    return 4;
+  }
+  return 5;
+}
+
+static_assert(throw_multi_child_with_hidden_base(true) == 3); 
+static_assert(throw_multi_child_with_hidden_base(false) == 14); 

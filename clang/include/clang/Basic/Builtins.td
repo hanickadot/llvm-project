@@ -932,6 +932,36 @@ def IsConstantEvaluated : LangBuiltin<"CXX_LANG"> {
   let Prototype = "bool()";
 }
 
+def CurrentConstexprExceptionPointer : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_current_constexpr_exception"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void*()";
+}
+
+def RethrowConstexprExceptionPointer : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_rethrow_constexpr_exception"];
+  let Attributes = [Constexpr];
+  let Prototype = "void(void *)";
+}
+
+def UncaughtConstexprExceptionPointer : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_uncaught_constexpr_exceptions"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "int()";
+}
+
+def ConstexprCrash : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_constexpr_crash"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void()";
+}
+
+def ConstexprDump : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_constexpr_dump"];
+  let Attributes = [NoThrow, CustomTypeChecking, Constexpr];
+  let Prototype = "void(void*)";
+}
+
 // GCC exception builtins
 def EHReturn : Builtin {
   let Spellings = ["__builtin_eh_return"];

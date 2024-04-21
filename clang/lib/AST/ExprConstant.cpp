@@ -1899,6 +1899,9 @@ static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
                                // TODO provide arguments
 static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType ExceptionType);
 
+
+/// Take exception from its slot and assign it to catch handler's variable
+static bool AssignExceptionToCatchHandler(QualType ExceptionTy, APValue & ExceptionValue, const VarDecl * HandlerVar, EvalInfo &Info, const Expr *E);
 //===----------------------------------------------------------------------===//
 // Misc utilities
 //===----------------------------------------------------------------------===//
@@ -5655,14 +5658,14 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     //// Evaluate try blocks by evaluating all sub statements.
     if (result == ESR_ExceptionThrown) {
       const QualType ExceptionType = Result.ExceptionType;
-      std::cout << "\nCatching exception...\n";
+      //std::cout << "\nCatching exception...\n";
       for (const Stmt * catchHandler: tryStatement->handlers()) {
-        std::cout << " * ";
+        //std::cout << " * ";
         const CXXCatchStmt * Catch = cast<CXXCatchStmt>(catchHandler);
         
         // handle catch(...) right now
         if (!Catch->getExceptionDecl()) {
-          std::cout << "catch(...)\n";
+          //std::cout << "catch(...)\n";
           return EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
         }
         
@@ -5676,7 +5679,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           continue;
         }
         
-        std::cout << Catch->getCaughtType().getAsString() << " vs exc = " << ExceptionType.getAsString() << "\n";
+        //std::cout << Catch->getCaughtType().getAsString() << " vs exc = " << ExceptionType.getAsString() << "\n";
         
         // create scope for variable to store/bind the exception
         FullExpressionRAII Scope(Info);
@@ -5685,17 +5688,13 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
         assert(exceptionVariableDecl->isExceptionVariable());
         
-        // FIXME: declare the variable
-        LValue ResultLValue;
-        APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
-        //ResultLValue.setFrom(Info.Ctx, Result.Exception);
-        Val = std::move(Result.Exception);
+        AssignExceptionToCatchHandler(Result.ExceptionType, Result.Exception, exceptionVariableDecl, Info, nullptr);
         
         // and evaluate the handler
         return EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
       }
       // TODO rethrow 
-      std::cout << " (not caught)\n";
+      //std::cout << " (not caught)\n";
       return ESR_ExceptionThrown;
     }
     return result;
@@ -9666,6 +9665,11 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return HandleOperatorNewCall(Info, E, Result);
   case Builtin::BI__builtin_launder:
     return evaluatePointer(E->getArg(0), Result);
+  case Builtin::BI__builtin_current_constexpr_exception:
+  case Builtin::BI__builtin_uncaught_constexpr_exceptions:
+    // TODO implement
+    std::cout << ":: unimplemented constexpr exception builtin called ::\n";
+    return Success(E);
   case Builtin::BIstrchr:
   case Builtin::BIwcschr:
   case Builtin::BImemchr:
@@ -11688,6 +11692,146 @@ static bool isUnambiguousPublicBaseClass(const Type *DerivedType,
          IsPublicBaseClass;
 }
 
+/*
+static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
+  assert(!E->isValueDependent());
+  // In C, function designators are not lvalues, but we evaluate them as if they
+  // are.
+  QualType T = E->getType();
+  if (E->isGLValue() || T->isFunctionType()) {
+    LValue LV;
+    if (!EvaluateLValue(E, LV, Info))
+      return false;
+    LV.moveInto(Result);
+  } else if (T->isVectorType()) {
+    if (!EvaluateVector(E, Result, Info))
+      return false;
+  } else if (T->isIntegralOrEnumerationType()) {
+    if (!IntExprEvaluator(Info, Result).Visit(E))
+      return false;
+  } else if (T->hasPointerRepresentation()) {
+    LValue LV;
+    if (!EvaluatePointer(E, LV, Info))
+      return false;
+    LV.moveInto(Result);
+  } else if (T->isRealFloatingType()) {
+    llvm::APFloat F(0.0);
+    if (!EvaluateFloat(E, F, Info))
+      return false;
+    Result = APValue(F);
+  } else if (T->isAnyComplexType()) {
+    ComplexValue C;
+    if (!EvaluateComplex(E, C, Info))
+      return false;
+    C.moveInto(Result);
+  } else if (T->isFixedPointType()) {
+    if (!FixedPointExprEvaluator(Info, Result).Visit(E)) return false;
+  } else if (T->isMemberPointerType()) {
+    MemberPtr P;
+    if (!EvaluateMemberPointer(E, P, Info))
+      return false;
+    P.moveInto(Result);
+    return true;
+  } else if (T->isArrayType()) {
+    LValue LV;
+    APValue &Value =
+        Info.CurrentCall->createTemporary(E, T, ScopeKind::FullExpression, LV);
+    if (!EvaluateArray(E, LV, Value, Info))
+      return false;
+    Result = Value;
+  } else if (T->isRecordType()) {
+    LValue LV;
+    APValue &Value =
+        Info.CurrentCall->createTemporary(E, T, ScopeKind::FullExpression, LV);
+    if (!EvaluateRecord(E, LV, Value, Info))
+      return false;
+    Result = Value;
+  } else if (T->isVoidType()) {
+    if (!Info.getLangOpts().CPlusPlus11)
+      Info.CCEDiag(E, diag::note_constexpr_nonliteral)
+        << E->getType();
+    if (!EvaluateVoid(E, Info))
+      return false;
+  } else if (T->isAtomicType()) {
+    QualType Unqual = T.getAtomicUnqualifiedType();
+    if (Unqual->isArrayType() || Unqual->isRecordType()) {
+      LValue LV;
+      APValue &Value = Info.CurrentCall->createTemporary(
+          E, Unqual, ScopeKind::FullExpression, LV);
+      if (!EvaluateAtomic(E, &LV, Value, Info))
+        return false;
+      Result = Value;
+    } else {
+      if (!EvaluateAtomic(E, nullptr, Result, Info))
+        return false;
+    }
+  } else if (Info.getLangOpts().CPlusPlus11) {
+    Info.FFDiag(E, diag::note_constexpr_nonliteral) << E->getType();
+    return false;
+  } else {
+    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    return false;
+  }
+
+  return true;
+}
+*/
+
+static bool AssignExceptionToCatchHandler(QualType ExceptionTy, APValue & ExceptionValue, const VarDecl * HandlerVar, EvalInfo &Info, const Expr *E) {
+  // FIXME: declare the variable
+  LValue ResultLValue;
+  APValue &Val = Info.CurrentCall->createTemporary(HandlerVar, HandlerVar->getType(), ScopeKind::Block, ResultLValue);
+  
+  //std::cout << "<<< AssignExceptionToCatchHandler >>>\n";
+  //Val.dump();
+  //std::cout << (int)Val.getKind() << "\n";
+  
+  QualType T = HandlerVar->getType();
+  //T.dump();
+  Val = ExceptionValue;
+  //handleAssignment(Info, E, ResultLValue, HandlerVar->getType(), ExceptionValue);
+  /*
+  if (T->isFunctionType()) {
+    std::cout << "< T->isFunctionType() >\n";
+  } else if (T->isVectorType()) {
+    std::cout << "< T->isVectorType() >\n";
+  } else if (T->isIntegralOrEnumerationType()) {
+    //std::cout << "< T->isIntegralOrEnumerationType() >\n";
+    Val = std::move(ExceptionValue);
+    return true;
+  } else if (T->hasPointerRepresentation()) {
+    std::cout << "< T->hasPointerRepresentation() >\n";
+    Val = std::move(ExceptionValue);  // TODO this sometimes fails
+  } else if (T->isRealFloatingType()) {
+    std::cout << "< T->isRealFloatingType() >\n";
+  } else if (T->isAnyComplexType()) {
+    std::cout << "< T->isAnyComplexType() >\n";
+  } else if (T->isFixedPointType()) {
+    std::cout << "< T->isFixedPointType() >\n";
+  } else if (T->isMemberPointerType()) {
+    std::cout << "< T->isMemberPointerType() >\n";
+  } else if (T->isArrayType()) {
+    std::cout << "< T->isArrayType() >\n";
+  } else if (T->isRecordType()) {
+    //std::cout << "< T->isRecordType() >\n";
+    Val = std::move(ExceptionValue);
+    return true;
+  } else if (T->isVoidType()) {
+    std::cout << "< T->isVoidType() >\n";
+  } else if (T->isAtomicType()) {
+    std::cout << "< T->isAtomicType() >\n";
+  } else if (Info.getLangOpts().CPlusPlus11) {
+    std::cout << "< nonliteral >\n";
+  } else {
+    std::cout << "< invalid subexpr >\n";
+  }*/
+  
+  // TODO provide implementation
+  //ResultLValue.setFrom(Info.Ctx, Result.Exception);
+  //Val = std::move(ExceptionValue);
+  return false;
+}
+
 static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception)
 {
   const Type * ExceptionTy = Exception.getTypePtrOrNull();
@@ -11701,26 +11845,26 @@ static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exce
   // The handler is of type cv T or cv T& and E and T are the same type
   // (ignoring the top-level cv-qualifiers) ...
   if (ExceptionCanTy == HandlerCanTy) {
-    std::cout << "E == T (ignoring top level cv-qualifier)\n";
+    //std::cout << "E == T (ignoring top level cv-qualifier)\n";
     return true;
   }
   
   // The handler is of type cv T or cv T& and T is an unambiguous public base
   // class of E ...
   if (isUnambiguousPublicBaseClass(ExceptionCanTy->getTypePtr(), HandlerCanTy->getTypePtr())) {
-    std::cout << "isUnambiguousPublicBaseClass\n";
+    //std::cout << "isUnambiguousPublicBaseClass\n";
     return true;
   }
   
   if (HandlerCanTy->getTypeClass() == Type::RValueReference || (HandlerCanTy->getTypeClass() == Type::LValueReference && !HandlerCanTy->getTypePtr()->getPointeeType().isConstQualified())) {
-    std::cout << "[R-value reference or non-const L-value reference]";
+    //std::cout << "[R-value reference or non-const L-value reference]";
     return false;
   }
   
   // TODO implement remainder
   
   
-  std::cout << "[" << QualType(HandlerTy,0).getAsString() << " vs " << QualType(ExceptionTy,0).getAsString() << "]";
+  //std::cout << "[" << QualType(HandlerTy,0).getAsString() << " vs " << QualType(ExceptionTy,0).getAsString() << "]";
   return false;
 }
 
@@ -12374,7 +12518,11 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   switch (BuiltinOp) {
   default:
     return false;
-
+  case Builtin::BI__builtin_uncaught_constexpr_exceptions: {
+    // TODO implement
+    std::cout << ":: __builtin_uncaught_constexpr_exceptions() called ::\n";
+    uint64_t Count = 0;
+    return Success(Count, E); }
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     // The type was checked when we built the expression.
@@ -15530,23 +15678,46 @@ public:
     if (!IsConstantEvaluatedBuiltinCall(E))
       return ExprEvaluatorBaseTy::VisitCallExpr(E);
 
-    switch (E->getBuiltinCallee()) {
-    case Builtin::BI__assume:
-    case Builtin::BI__builtin_assume:
-      // The argument is not evaluated!
-      return true;
-
-    case Builtin::BI__builtin_operator_delete:
-      return HandleOperatorDeleteCall(Info, E);
-
-    default:
-      return false;
-    }
+    return VisitBuiltinCallExpr(E, E->getBuiltinCallee());
   }
+  
+  bool VisitBuiltinCallExpr(const CallExpr *E, unsigned BuiltinOp);
 
   bool VisitCXXDeleteExpr(const CXXDeleteExpr *E);
 };
 } // end anonymous namespace
+
+
+bool VoidExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
+                                            unsigned BuiltinOp) {
+  switch (BuiltinOp) {
+  default:
+    return false;
+  case Builtin::BI__assume:
+  case Builtin::BI__builtin_assume:
+    // The argument is not evaluated!
+    return true;
+
+  case Builtin::BI__builtin_operator_delete:
+    return HandleOperatorDeleteCall(Info, E);
+  case Builtin::BI__builtin_rethrow_constexpr_exception:
+    // TODO implement
+    std::cout << ":: __builtin_rethrow_constexpr_exception() called ::\n";
+    return true;
+  case Builtin::BI__builtin_constexpr_crash:
+    std::cout << ":: __builtin_constexpr_crash() called ::\n";
+    return true;
+  case Builtin::BI__builtin_constexpr_dump: {
+    APValue result;
+    bool r = Evaluate(result, Info, E->getArg(0));
+    if (!Info.CheckingPotentialConstantExpression) {
+      E->getArg(0)->dump();
+      result.dump();
+    }
+    return r;
+  }
+  }
+}
 
 bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
   // We cannot speculatively evaluate a delete expression.
