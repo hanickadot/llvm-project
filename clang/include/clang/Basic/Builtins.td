@@ -789,6 +789,12 @@ def BuiltinConstantP : Builtin {
   let Prototype = "int(...)";
 }
 
+def BuiltinConstexprStepsRemaining : Builtin {
+  let Spellings = ["__builtin_constexpr_steps_remaining"];
+  let Attributes = [NoThrow, Const, Constexpr];
+  let Prototype = "int()";
+}
+
 def BuiltinClassifyType : Builtin {
   let Spellings = ["__builtin_classify_type"];
   let Attributes = [NoThrow, Const, CustomTypeChecking, UnevaluatedArguments, Constexpr];

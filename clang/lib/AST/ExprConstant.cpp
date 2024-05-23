@@ -12525,6 +12525,12 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
     return false;
   }
+	
+	case Builtin::BI__builtin_constexpr_steps_remaining: {
+		if (!Info.InConstantContext) 
+			return false;
+		return Success(Info.StepsLeft, E);
+	}
 
   case Builtin::BI__builtin_is_constant_evaluated: {
     const auto *Callee = Info.CurrentCall->getCallee();
