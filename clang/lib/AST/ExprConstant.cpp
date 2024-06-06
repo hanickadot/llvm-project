@@ -63,6 +63,7 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <iostream> // FIXME remove
 
 #define DEBUG_TYPE "exprconstant"
 
@@ -4930,6 +4931,8 @@ enum EvalStmtResult {
   ESR_Failed,
   /// Hit a 'return' statement.
   ESR_Returned,
+  /// Hit a 'throw' statement.
+  ESR_ExceptionThrown,
   /// Evaluation succeeded.
   ESR_Succeeded,
   /// Hit a 'continue' statement.
@@ -5053,6 +5056,7 @@ static EvalStmtResult EvaluateLoopBody(StmtResult &Result, EvalInfo &Info,
     return ESR_Continue;
   case ESR_Failed:
   case ESR_Returned:
+  case ESR_ExceptionThrown:
   case ESR_CaseNotFound:
     return ESR;
   }
@@ -5127,6 +5131,7 @@ static EvalStmtResult EvaluateSwitch(StmtResult &Result, EvalInfo &Info,
   case ESR_Continue:
   case ESR_Failed:
   case ESR_Returned:
+  case ESR_ExceptionThrown:
     return ESR;
   case ESR_CaseNotFound:
     // This can only happen if the switch case is nested within a statement
@@ -5633,12 +5638,22 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
               : Evaluate(Result.Value, Info, ThrowExpr)))
       return ESR_Failed;
     // TODO different return value
-    return Scope.destroy() ? ESR_Returned : ESR_Failed;
+    return Scope.destroy() ? ESR_ExceptionThrown : ESR_Failed;
   }
 
-  case Stmt::CXXTryStmtClass:
+  case Stmt::CXXTryStmtClass: {
+    const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
     // Evaluate try blocks by evaluating all sub statements.
-    return EvaluateStmt(Result, Info, cast<CXXTryStmt>(S)->getTryBlock(), Case);
+    const EvalStmtResult result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
+    
+    // If we got an exception we need to inspect all our exception handlers and select first compatible
+    if (result == ESR_ExceptionThrown) {
+      // TODO 
+      std::cout << "Exception thrown\n";
+    }
+    
+    return result;
+  }
   }
 }
 
