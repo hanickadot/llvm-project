@@ -5618,6 +5618,24 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   case Stmt::CaseStmtClass:
   case Stmt::DefaultStmtClass:
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
+
+  case Stmt::CXXThrowExprClass: {
+    const Expr *ThrowExpr = cast<CXXThrowExpr>(S)->getSubExpr();
+    FullExpressionRAII Scope(Info);
+    if (ThrowExpr && ThrowExpr->isValueDependent()) {
+      EvaluateDependentExpr(ThrowExpr, Info);
+      // We know we returned, but we don't know what the value is.
+      return ESR_Failed;
+    }
+    if (ThrowExpr &&
+        !(Result.Slot
+              ? EvaluateInPlace(Result.Value, Info, *Result.Slot, ThrowExpr)
+              : Evaluate(Result.Value, Info, ThrowExpr)))
+      return ESR_Failed;
+    // TODO different return value
+    return Scope.destroy() ? ESR_Returned : ESR_Failed;
+  }
+
   case Stmt::CXXTryStmtClass:
     // Evaluate try blocks by evaluating all sub statements.
     return EvaluateStmt(Result, Info, cast<CXXTryStmt>(S)->getTryBlock(), Case);
