@@ -4714,3 +4714,34 @@ def ArithmeticFence : LangBuiltin<"ALL_LANGUAGES"> {
   let Attributes = [CustomTypeChecking, Constexpr];
   let Prototype = "void(...)";
 }
+
+// Support for constexpr exceptions
+def ConstexprExceptionCurrentException : LangBuiltin<"CXX_LANG"> {
+	let Spellings = ["__builtin_constexpr_current_exception"];
+	let Attributes = [Constexpr,NoThrow];
+	let Prototype = "void*()";
+}
+
+def ConstexprExceptionUncaughtExceptions : LangBuiltin<"CXX_LANG"> {
+	let Spellings = ["__builtin_constexpr_uncaught_exceptions"];
+	let Attributes = [Constexpr,NoThrow];
+	let Prototype = "int()";
+}
+
+def ConstexprRethrowException : LangBuiltin<"CXX_LANG"> {
+	let Spellings = ["__builtin_constexpr_rethrow_exception"];
+	let Attributes = [Constexpr];
+	let Prototype = "void(void *)";
+}
+
+def ConstexprExceptionRefCountInc : LangBuiltin<"CXX_LANG"> {
+	let Spellings = ["__builtin_constexpr_exception_refcount_inc"];
+	let Attributes = [Constexpr,NoThrow];
+	let Prototype = "void(void *)";
+}
+
+def ConstexprExceptionRefCountDec : LangBuiltin<"CXX_LANG"> {
+	let Spellings = ["__builtin_constexpr_exception_refcount_dec"];
+	let Attributes = [Constexpr,NoThrow];
+	let Prototype = "void(void *)";
+}
