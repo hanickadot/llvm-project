@@ -5632,6 +5632,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       // We know we returned, but we don't know what the value is.
       return ESR_Failed;
     }
+    // TODO don't use return slot
     if (ThrowExpr &&
         !(Result.Slot
               ? EvaluateInPlace(Result.Value, Info, *Result.Slot, ThrowExpr)
@@ -5650,6 +5651,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     if (result == ESR_ExceptionThrown) {
       // TODO 
       std::cout << "Exception thrown\n";
+      return ESR_Returned;
     }
     
     return result;
@@ -9523,6 +9525,10 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BI__addressof:
   case Builtin::BI__builtin_addressof:
     return evaluateLValue(E->getArg(0), Result);
+  case Builtin::BI__builtin_constexpr_current_exception:
+    // TODO return nullptr
+    // TODO implement functionality
+    return ZeroInitialization(E);
   case Builtin::BI__builtin_assume_aligned: {
     // We need to be very careful here because: if the pointer does not have the
     // asserted alignment, then the behavior is undefined, and undefined
@@ -12376,7 +12382,9 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   switch (BuiltinOp) {
   default:
     return false;
-
+  case Builtin::BI__builtin_constexpr_uncaught_exceptions:
+    // TODO return number of uncaught exceptions
+    return Success(0, E);
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     // The type was checked when we built the expression.
@@ -15537,7 +15545,14 @@ public:
     case Builtin::BI__builtin_assume:
       // The argument is not evaluated!
       return true;
-
+    case Builtin::BI__builtin_constexpr_exception_refcount_inc:
+    case Builtin::BI__builtin_constexpr_exception_refcount_dec:
+      // TODO: update refcount for exceptions
+      // TODO: destroy exception when refcount == 0
+      return true;
+    case Builtin::BI__builtin_constexpr_rethrow_exception:
+      // TODO: throw exception from here
+      return true;
     case Builtin::BI__builtin_operator_delete:
       return HandleOperatorDeleteCall(Info, E);
 
