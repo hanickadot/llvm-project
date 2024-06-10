@@ -45,8 +45,8 @@ _LIBCPP_EXPORTED_FROM_ABI constexpr bool uncaught_exception() _NOEXCEPT {
 
 class _LIBCPP_EXPORTED_FROM_ABI exception_ptr;
 
-_LIBCPP_EXPORTED_FROM_ABI constexpr exception_ptr current_exception() _NOEXCEPT;
-_LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr);
+_LIBCPP_ALWAYS_INLINE constexpr exception_ptr current_exception() _NOEXCEPT;
+_LIBCPP_ALWAYS_INLINE _LIBCPP_NORETURN constexpr void rethrow_exception(exception_ptr);
 } // namespace std
 
 #endif // _LIBCPP___EXCEPTION_OPERATIONS_H

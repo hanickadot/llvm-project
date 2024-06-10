@@ -63,22 +63,22 @@ class _LIBCPP_EXPORTED_FROM_ABI exception_ptr {
   void* __ptr_;
 
   static exception_ptr __from_native_exception_pointer(void*) _NOEXCEPT;
-  void __copy_from(const exception_ptr&) _NOEXCEPT;
-  void __assign_from(const exception_ptr&) _NOEXCEPT;
-  void __destroy() _NOEXCEPT;
-  static exception_ptr __current_exception() _NOEXCEPT;
-  _LIBCPP_NORETURN static void __rethrow_exception(const exception_ptr &);
+  _LIBCPP_EXPORTED_FROM_ABI void __copy_from(const exception_ptr&) _NOEXCEPT;
+  _LIBCPP_EXPORTED_FROM_ABI void __assign_from(const exception_ptr&) _NOEXCEPT;
+  _LIBCPP_EXPORTED_FROM_ABI void __destroy() _NOEXCEPT;
+  _LIBCPP_EXPORTED_FROM_ABI static exception_ptr __current_exception() _NOEXCEPT;
+  _LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI static void __rethrow_exception(const exception_ptr &);
 
   template <class _Ep>
   friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
 
-  explicit constexpr exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
+  _LIBCPP_HIDE_FROM_ABI explicit constexpr exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
 
 public:
   _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr() _NOEXCEPT : __ptr_() {}
   _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr(nullptr_t) _NOEXCEPT : __ptr_() {}
 
-  constexpr exception_ptr(const exception_ptr& rhs) _NOEXCEPT: __ptr_(rhs.__ptr_) {
+  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr(const exception_ptr& rhs) _NOEXCEPT: __ptr_(rhs.__ptr_) {
     if consteval {
       __builtin_constexpr_exception_refcount_inc(__ptr_);
     } else {
@@ -86,7 +86,7 @@ public:
     }
   }
   
-  constexpr exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
     if consteval {
       if (rhs.__ptr_ != __ptr_) {
         void * old = __ptr_;
@@ -99,7 +99,7 @@ public:
     return *this;
   }
   
-  constexpr ~exception_ptr() _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI constexpr ~exception_ptr() _NOEXCEPT {
     if consteval {
       __builtin_constexpr_exception_refcount_dec(__ptr_);
     } else {
@@ -117,7 +117,7 @@ public:
     return !(__x == __y);
   }
 
-  friend _LIBCPP_EXPORTED_FROM_ABI constexpr exception_ptr current_exception() _NOEXCEPT {
+  _LIBCPP_ALWAYS_INLINE friend constexpr exception_ptr current_exception() _NOEXCEPT {
     if consteval {
       return exception_ptr{__builtin_constexpr_current_exception()};
     } else {
@@ -125,7 +125,7 @@ public:
     }
   }
   
-  _LIBCPP_NORETURN friend _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr eptr) {
+  _LIBCPP_ALWAYS_INLINE _LIBCPP_NORETURN friend constexpr void rethrow_exception(exception_ptr eptr) {
     if consteval {
       __builtin_constexpr_rethrow_exception(eptr.__ptr_);
     } else {
