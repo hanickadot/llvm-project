@@ -125,7 +125,7 @@ public:
     }
   }
   
-  friend _LIBCPP_EXPORTED_FROM_ABI _LIBCPP_NORETURN constexpr void rethrow_exception(exception_ptr eptr) {
+  _LIBCPP_NORETURN friend _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr eptr) {
     if consteval {
       __builtin_constexpr_rethrow_exception(eptr.__ptr_);
     } else {
