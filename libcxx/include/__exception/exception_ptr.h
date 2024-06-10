@@ -63,15 +63,14 @@ class _LIBCPP_EXPORTED_FROM_ABI exception_ptr {
   void* __ptr_;
 
   static exception_ptr __from_native_exception_pointer(void*) _NOEXCEPT;
-
-  template <class _Ep>
-  friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
-
-  void __construct_from(const exception_ptr&) _NOEXCEPT;
+  void __copy_from(const exception_ptr&) _NOEXCEPT;
   void __assign_from(const exception_ptr&) _NOEXCEPT;
   void __destroy() _NOEXCEPT;
   static exception_ptr __current_exception() _NOEXCEPT;
-  static void __rethrow_exception();
+  static void __rethrow_exception(const exception_ptr &);
+
+  template <class _Ep>
+  friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
 
   explicit constexpr exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
 
