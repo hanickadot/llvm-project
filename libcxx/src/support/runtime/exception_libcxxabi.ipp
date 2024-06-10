@@ -13,9 +13,7 @@
 
 namespace std {
 
-bool uncaught_exception() noexcept { return uncaught_exceptions() > 0; }
-
-int uncaught_exceptions() noexcept {
+int __runtime_uncaught_exceptions() noexcept {
 #if _LIBCPPABI_VERSION > 1001
   return __cxa_uncaught_exceptions();
 #else

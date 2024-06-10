@@ -29,13 +29,24 @@ using terminate_handler = void (*)();
 _LIBCPP_EXPORTED_FROM_ABI terminate_handler set_terminate(terminate_handler) _NOEXCEPT;
 _LIBCPP_EXPORTED_FROM_ABI terminate_handler get_terminate() _NOEXCEPT;
 
-_LIBCPP_EXPORTED_FROM_ABI bool uncaught_exception() _NOEXCEPT;
-_LIBCPP_EXPORTED_FROM_ABI int uncaught_exceptions() _NOEXCEPT;
+_LIBCPP_EXPORTED_FROM_ABI int __runtime_uncaught_exceptions() _NOEXCEPT;
+
+_LIBCPP_EXPORTED_FROM_ABI constexpr int uncaught_exceptions() _NOEXCEPT {
+  if consteval {
+    return __builtin_constexpr_uncaught_exceptions();
+  } else {
+    return __runtime_uncaught_exceptions();
+  }
+}
+
+_LIBCPP_EXPORTED_FROM_ABI constexpr bool uncaught_exception() _NOEXCEPT {
+  return uncaught_exceptions() > 0;
+}
 
 class _LIBCPP_EXPORTED_FROM_ABI exception_ptr;
 
-_LIBCPP_EXPORTED_FROM_ABI exception_ptr current_exception() _NOEXCEPT;
-_LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI void rethrow_exception(exception_ptr);
+_LIBCPP_EXPORTED_FROM_ABI constexpr exception_ptr current_exception() _NOEXCEPT;
+_LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr);
 } // namespace std
 
 #endif // _LIBCPP___EXCEPTION_OPERATIONS_H
