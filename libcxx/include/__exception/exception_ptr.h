@@ -70,24 +70,24 @@ class _LIBCPP_EXPORTED_FROM_ABI exception_ptr {
   _LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI static void __rethrow_exception(const exception_ptr &);
 
   template <class _Ep>
-  friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
+  friend _LIBCPP_CONSTEXPR_SINCE_CXX20 _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
 
-  _LIBCPP_HIDE_FROM_ABI explicit constexpr exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
+  _LIBCPP_HIDE_FROM_ABI explicit _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
 
 public:
-  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr() _NOEXCEPT : __ptr_() {}
-  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr(nullptr_t) _NOEXCEPT : __ptr_() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr() _NOEXCEPT : __ptr_() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr(nullptr_t) _NOEXCEPT : __ptr_() {}
 
-  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr(const exception_ptr& rhs) _NOEXCEPT: __ptr_(rhs.__ptr_) {
-    if consteval {
+  _LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr(const exception_ptr& rhs) _NOEXCEPT: __ptr_(rhs.__ptr_) {
+    if (__builtin_is_constant_evaluated()) {
       __builtin_constexpr_exception_refcount_inc(__ptr_);
     } else {
       __copy_from(rhs);
     }
   }
   
-  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
-    if consteval {
+  _LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
+    if (__builtin_is_constant_evaluated()) {
       if (rhs.__ptr_ != __ptr_) {
         void * old = __ptr_;
         __ptr_ = rhs.__ptr_;
@@ -99,34 +99,34 @@ public:
     return *this;
   }
   
-  _LIBCPP_HIDE_FROM_ABI constexpr ~exception_ptr() _NOEXCEPT {
-    if consteval {
+  _LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 ~exception_ptr() _NOEXCEPT {
+    if (__builtin_is_constant_evaluated()) {
       __builtin_constexpr_exception_refcount_dec(__ptr_);
     } else {
       __destroy();
     }
   }
 
-  _LIBCPP_HIDE_FROM_ABI explicit constexpr operator bool() const _NOEXCEPT { return __ptr_ != nullptr; }
+  _LIBCPP_HIDE_FROM_ABI explicit _LIBCPP_CONSTEXPR_SINCE_CXX20 operator bool() const _NOEXCEPT { return __ptr_ != nullptr; }
 
-  friend _LIBCPP_HIDE_FROM_ABI constexpr bool operator==(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 bool operator==(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
     return __x.__ptr_ == __y.__ptr_;
   }
 
-  friend _LIBCPP_HIDE_FROM_ABI constexpr bool operator!=(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 bool operator!=(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
     return !(__x == __y);
   }
 
-  _LIBCPP_ALWAYS_INLINE friend constexpr exception_ptr current_exception() _NOEXCEPT {
-    if consteval {
+  _LIBCPP_ALWAYS_INLINE friend _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr current_exception() _NOEXCEPT {
+    if (__builtin_is_constant_evaluated()) {
       return exception_ptr{__builtin_constexpr_current_exception()};
     } else {
       return __current_exception();
     }
   }
   
-  _LIBCPP_ALWAYS_INLINE _LIBCPP_NORETURN friend constexpr void rethrow_exception(exception_ptr eptr) {
-    if consteval {
+  _LIBCPP_NORETURN _LIBCPP_ALWAYS_INLINE friend _LIBCPP_CONSTEXPR_SINCE_CXX20 void rethrow_exception(exception_ptr eptr) {
+    if (__builtin_is_constant_evaluated()) {
       __builtin_constexpr_rethrow_exception(eptr.__ptr_);
     } else {
       __rethrow_exception(eptr);
@@ -135,8 +135,8 @@ public:
 };
 
 template <class _Ep>
-_LIBCPP_HIDE_FROM_ABI constexpr exception_ptr make_exception_ptr(_Ep __e) _NOEXCEPT {
-  if consteval {
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr make_exception_ptr(_Ep __e) _NOEXCEPT {
+  if (__builtin_is_constant_evaluated()) {
     try {
       throw __e;
     } catch (...) {
