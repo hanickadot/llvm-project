@@ -82,7 +82,7 @@ public:
     if consteval {
       __builtin_constexpr_exception_refcount_inc(__ptr_);
     } else {
-      __construct_from(rhs);
+      __copy_from(rhs);
     }
     return *this;
   }
