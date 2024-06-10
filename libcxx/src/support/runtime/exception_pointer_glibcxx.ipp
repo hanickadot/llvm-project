@@ -33,17 +33,17 @@ struct exception_ptr {
 
 _LIBCPP_NORETURN void rethrow_exception(__exception_ptr::exception_ptr);
 
-exception_ptr::~exception_ptr() noexcept { reinterpret_cast<__exception_ptr::exception_ptr*>(this)->~exception_ptr(); }
+void exception_ptr::__destroy() noexcept { reinterpret_cast<__exception_ptr::exception_ptr*>(this)->~exception_ptr(); }
 
-exception_ptr::exception_ptr(const exception_ptr& other) noexcept : __ptr_(other.__ptr_) {
+void exception_ptr::__copy_from(const exception_ptr& other) noexcept {
+  __ptr_ = other.__ptr_; // FIXME should this be here?
   new (reinterpret_cast<void*>(this))
       __exception_ptr::exception_ptr(reinterpret_cast<const __exception_ptr::exception_ptr&>(other));
 }
 
-exception_ptr& exception_ptr::operator=(const exception_ptr& other) noexcept {
+void exception_ptr::__assign_from(const exception_ptr& other) noexcept {
   *reinterpret_cast<__exception_ptr::exception_ptr*>(this) =
       reinterpret_cast<const __exception_ptr::exception_ptr&>(other);
-  return *this;
 }
 
 exception_ptr exception_ptr::__from_native_exception_pointer(void* __e) noexcept {
@@ -61,7 +61,7 @@ _LIBCPP_NORETURN void nested_exception::rethrow_nested() const {
   rethrow_exception(__ptr_);
 }
 
-_LIBCPP_NORETURN void rethrow_exception(exception_ptr p) {
+_LIBCPP_NORETURN void exception_ptr::rethrow_exception(exception_ptr p) {
   rethrow_exception(reinterpret_cast<__exception_ptr::exception_ptr&>(p));
 }
 

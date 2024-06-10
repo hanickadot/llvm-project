@@ -84,7 +84,6 @@ public:
     } else {
       __copy_from(rhs);
     }
-    return *this;
   }
   
   constexpr exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
