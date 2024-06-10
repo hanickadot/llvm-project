@@ -67,7 +67,7 @@ class _LIBCPP_EXPORTED_FROM_ABI exception_ptr {
   void __assign_from(const exception_ptr&) _NOEXCEPT;
   void __destroy() _NOEXCEPT;
   static exception_ptr __current_exception() _NOEXCEPT;
-  static void __rethrow_exception(const exception_ptr &);
+  _LIBCPP_NORETURN static void __rethrow_exception(const exception_ptr &);
 
   template <class _Ep>
   friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
@@ -125,7 +125,7 @@ public:
     }
   }
   
-  friend _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr eptr) {
+  friend _LIBCPP_EXPORTED_FROM_ABI _LIBCPP_NORETURN constexpr void rethrow_exception(exception_ptr eptr) {
     if consteval {
       __builtin_constexpr_rethrow_exception(eptr.__ptr_);
     } else {
