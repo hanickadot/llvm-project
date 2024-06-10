@@ -57,38 +57,94 @@ namespace std { // purposefully not using versioning namespace
 
 #ifndef _LIBCPP_ABI_MICROSOFT
 
+class _LIBCPP_EXPORTED_FROM_ABI exception_ptr;
+
 class _LIBCPP_EXPORTED_FROM_ABI exception_ptr {
   void* __ptr_;
 
   static exception_ptr __from_native_exception_pointer(void*) _NOEXCEPT;
 
   template <class _Ep>
-  friend _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
+  friend constexpr _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep) _NOEXCEPT;
+
+  void __construct_from(const exception_ptr&) _NOEXCEPT;
+  void __assign_from(const exception_ptr&) _NOEXCEPT;
+  void __destroy() _NOEXCEPT;
+  static exception_ptr __current_exception() _NOEXCEPT;
+  static void __rethrow_exception();
+
+  explicit constexpr exception_ptr(void* eptr) _NOEXCEPT: __ptr_{eptr} { }
 
 public:
-  _LIBCPP_HIDE_FROM_ABI exception_ptr() _NOEXCEPT : __ptr_() {}
-  _LIBCPP_HIDE_FROM_ABI exception_ptr(nullptr_t) _NOEXCEPT : __ptr_() {}
+  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr() _NOEXCEPT : __ptr_() {}
+  _LIBCPP_HIDE_FROM_ABI constexpr exception_ptr(nullptr_t) _NOEXCEPT : __ptr_() {}
 
-  exception_ptr(const exception_ptr&) _NOEXCEPT;
-  exception_ptr& operator=(const exception_ptr&) _NOEXCEPT;
-  ~exception_ptr() _NOEXCEPT;
+  constexpr exception_ptr(const exception_ptr& rhs) _NOEXCEPT: __ptr_(rhs.__ptr_) {
+    if consteval {
+      __builtin_constexpr_exception_refcount_inc(__ptr_);
+    } else {
+      __construct_from(rhs);
+    }
+    return *this;
+  }
+  
+  constexpr exception_ptr& operator=(const exception_ptr& rhs) _NOEXCEPT {
+    if consteval {
+      if (rhs.__ptr_ != __ptr_) {
+        void * old = __ptr_;
+        __ptr_ = rhs.__ptr_;
+        __builtin_constexpr_exception_refcount_dec(old);
+      }
+    } else {
+      __assign_from(rhs);
+    }
+    return *this;
+  }
+  
+  constexpr ~exception_ptr() _NOEXCEPT {
+    if consteval {
+      __builtin_constexpr_exception_refcount_dec(__ptr_);
+    } else {
+      __destroy();
+    }
+  }
 
-  _LIBCPP_HIDE_FROM_ABI explicit operator bool() const _NOEXCEPT { return __ptr_ != nullptr; }
+  _LIBCPP_HIDE_FROM_ABI explicit constexpr operator bool() const _NOEXCEPT { return __ptr_ != nullptr; }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool operator==(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
+  friend _LIBCPP_HIDE_FROM_ABI constexpr bool operator==(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
     return __x.__ptr_ == __y.__ptr_;
   }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
+  friend _LIBCPP_HIDE_FROM_ABI constexpr bool operator!=(const exception_ptr& __x, const exception_ptr& __y) _NOEXCEPT {
     return !(__x == __y);
   }
 
-  friend _LIBCPP_EXPORTED_FROM_ABI exception_ptr current_exception() _NOEXCEPT;
-  friend _LIBCPP_EXPORTED_FROM_ABI void rethrow_exception(exception_ptr);
+  friend _LIBCPP_EXPORTED_FROM_ABI constexpr exception_ptr current_exception() _NOEXCEPT {
+    if consteval {
+      return exception_ptr{__builtin_constexpr_current_exception()};
+    } else {
+      return __current_exception();
+    }
+  }
+  
+  friend _LIBCPP_EXPORTED_FROM_ABI constexpr void rethrow_exception(exception_ptr eptr) {
+    if consteval {
+      __builtin_constexpr_rethrow_exception(eptr.__ptr_);
+    } else {
+      __rethrow_exception(eptr);
+    }
+  }
 };
 
 template <class _Ep>
-_LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep __e) _NOEXCEPT {
+_LIBCPP_HIDE_FROM_ABI constexpr exception_ptr make_exception_ptr(_Ep __e) _NOEXCEPT {
+  if consteval {
+    try {
+      throw __e;
+    } catch (...) {
+      return current_exception();
+    }
+  } else {
 #  ifndef _LIBCPP_HAS_NO_EXCEPTIONS
 #    if _LIBCPP_AVAILABILITY_HAS_INIT_PRIMARY_EXCEPTION && __cplusplus >= 201103L
   using _Ep2 = __decay_t<_Ep>;
@@ -124,6 +180,7 @@ _LIBCPP_HIDE_FROM_ABI exception_ptr make_exception_ptr(_Ep __e) _NOEXCEPT {
   ((void)__e);
   std::abort();
 #  endif
+  }
 }
 
 #else // _LIBCPP_ABI_MICROSOFT
