@@ -7924,6 +7924,24 @@ public:
     return true;
   }
   
+  static bool StoreAtomicValue(const AtomicExpr *E, EvalInfo &Info) {
+    LValue LV;
+    if (!EvaluatePointer(E->getPtr(), LV, Info)) {
+      return false;
+    }
+    
+    APValue NewVal;
+    if (!Evaluate(NewVal, Info, E->getVal1())) {
+      return false;
+    }
+    
+    if (!handleAssignment(Info, E, LV, E->getVal1()->getType(), NewVal)) {
+      return false;
+    }
+    
+    return true;
+  }
+  
   bool VisitAtomicExpr(const AtomicExpr *E) {
     APValue LocalResult;
     switch (E->getOp()) {
@@ -7942,8 +7960,10 @@ public:
         }
         return DerivedSuccess(LocalResult, E);
       case AtomicExpr::AO__c11_atomic_exchange:
-        // TODO set
         if (!LoadAtomicValue(E, LocalResult, Info)) {
+          return Error(E);
+        }
+        if (!StoreAtomicValue(E, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
@@ -15600,11 +15620,8 @@ public:
     default:
       return Error(E);
     case AtomicExpr::AO__c11_atomic_init:
-      // TODO set operation
-      return true;
     case AtomicExpr::AO__c11_atomic_store:
-      // TODO set operation
-      return true;
+      return StoreAtomicValue(E, Info);
     }
   }
 
