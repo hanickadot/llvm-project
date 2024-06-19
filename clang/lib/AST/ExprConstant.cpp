@@ -7903,6 +7903,65 @@ public:
     }
     return StmtVisitorTy::Visit(Source);
   }
+  
+  static bool LoadAtomicValue(const AtomicExpr *E, APValue & Result, EvalInfo &Info) {
+    LValue Value;
+    if (!EvaluatePointer(E->getPtr(), Value, Info)) {
+      return false;
+    }
+
+    // we ignore order
+    [[maybe_unused]] APSInt Order;
+    if (!EvaluateInteger(E->getOrder(), Order, Info)) {
+      return false;
+    }
+
+    // convert pointer to value
+    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), Value, Result)) {
+      return false;
+    }
+
+    return true;
+  }
+  
+  bool VisitAtomicExpr(const AtomicExpr *E) {
+    APValue LocalResult;
+    switch (E->getOp()) {
+      default:
+        return Error(E);
+      case AtomicExpr::AO__c11_atomic_load:
+        if (!LoadAtomicValue(E, LocalResult, Info)) {
+          return Error(E);
+        }
+        return DerivedSuccess(LocalResult, E);
+      case AtomicExpr::AO__c11_atomic_compare_exchange_strong:
+      case AtomicExpr::AO__c11_atomic_compare_exchange_weak:
+        // TODO compare + conditional exchange
+        if (!LoadAtomicValue(E, LocalResult, Info)) {
+          return Error(E);
+        }
+        return DerivedSuccess(LocalResult, E);
+      case AtomicExpr::AO__c11_atomic_exchange:
+        // TODO set
+        if (!LoadAtomicValue(E, LocalResult, Info)) {
+          return Error(E);
+        }
+        return DerivedSuccess(LocalResult, E);
+      case AtomicExpr::AO__c11_atomic_fetch_add:
+      case AtomicExpr::AO__c11_atomic_fetch_sub:
+      case AtomicExpr::AO__c11_atomic_fetch_and:
+      case AtomicExpr::AO__c11_atomic_fetch_or:
+      case AtomicExpr::AO__c11_atomic_fetch_xor:
+      case AtomicExpr::AO__c11_atomic_fetch_nand:
+      case AtomicExpr::AO__c11_atomic_fetch_max:
+      case AtomicExpr::AO__c11_atomic_fetch_min:
+        // TODO <op>
+        if (!LoadAtomicValue(E, LocalResult, Info)) {
+          return Error(E);
+        }
+        return DerivedSuccess(LocalResult, E);
+    }
+  }
 
   bool VisitPseudoObjectExpr(const PseudoObjectExpr *E) {
     for (const Expr *SemE : E->semantics()) {
@@ -11544,7 +11603,7 @@ public:
   bool VisitCharacterLiteral(const CharacterLiteral *E) {
     return Success(E->getValue(), E);
   }
-
+  
   bool CheckReferencedDecl(const Expr *E, const Decl *D);
   bool VisitDeclRefExpr(const DeclRefExpr *E) {
     if (CheckReferencedDecl(E, E->getDecl()))
@@ -15532,6 +15591,19 @@ public:
       return ExprEvaluatorBaseTy::VisitCastExpr(E);
     case CK_ToVoid:
       VisitIgnoredValue(E->getSubExpr());
+      return true;
+    }
+  }
+  
+  bool VisitAtomicExpr(const AtomicExpr *E) {
+    switch (E->getOp()) {
+    default:
+      return Error(E);
+    case AtomicExpr::AO__c11_atomic_init:
+      // TODO set operation
+      return true;
+    case AtomicExpr::AO__c11_atomic_store:
+      // TODO set operation
       return true;
     }
   }
