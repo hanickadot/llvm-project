@@ -195,7 +195,7 @@ public:
         std::__to_gcc_failure_order(__order));
   }
 
-  _LIBCPP_HIDE_FROM_ABI void wait(_Tp __old, memory_order __order = memory_order::seq_cst) const noexcept
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void wait(_Tp __old, memory_order __order = memory_order::seq_cst) const noexcept
       _LIBCPP_CHECK_WAIT_MEMORY_ORDER(__order) {
     _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
         __order == memory_order::relaxed || __order == memory_order::consume || __order == memory_order::acquire ||
@@ -203,8 +203,8 @@ public:
         "atomic_ref: memory order argument to atomic wait operation is invalid");
     std::__atomic_wait(*this, __old, __order);
   }
-  _LIBCPP_HIDE_FROM_ABI void notify_one() const noexcept { std::__atomic_notify_one(*this); }
-  _LIBCPP_HIDE_FROM_ABI void notify_all() const noexcept { std::__atomic_notify_all(*this); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void notify_one() const noexcept { std::__atomic_notify_one(*this); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void notify_all() const noexcept { std::__atomic_notify_all(*this); }
 };
 
 template <class _Tp>

@@ -52,20 +52,20 @@ struct atomic_flag {
   wait(bool __v, memory_order __m = memory_order_seq_cst) const volatile _NOEXCEPT {
     std::__atomic_wait(*this, _LIBCPP_ATOMIC_FLAG_TYPE(__v), __m);
   }
-  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
+  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_CONSTEXPR _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
   wait(bool __v, memory_order __m = memory_order_seq_cst) const _NOEXCEPT {
     std::__atomic_wait(*this, _LIBCPP_ATOMIC_FLAG_TYPE(__v), __m);
   }
   _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_one() volatile _NOEXCEPT {
     std::__atomic_notify_one(*this);
   }
-  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_one() _NOEXCEPT {
+  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_CONSTEXPR _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_one() _NOEXCEPT {
     std::__atomic_notify_one(*this);
   }
   _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_all() volatile _NOEXCEPT {
     std::__atomic_notify_all(*this);
   }
-  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_all() _NOEXCEPT {
+  _LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_CONSTEXPR _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void notify_all() _NOEXCEPT {
     std::__atomic_notify_all(*this);
   }
 

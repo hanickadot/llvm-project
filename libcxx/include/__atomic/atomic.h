@@ -438,7 +438,7 @@ atomic_wait(const volatile atomic<_Tp>* __o, typename atomic<_Tp>::value_type __
 }
 
 template <class _Tp>
-_LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
+_LIBCPP_AVAILABILITY_SYNC _LIBCPP_CONSTEXPR _LIBCPP_HIDE_FROM_ABI void
 atomic_wait(const atomic<_Tp>* __o, typename atomic<_Tp>::value_type __v) _NOEXCEPT {
   return __o->wait(__v);
 }
@@ -453,7 +453,7 @@ atomic_wait_explicit(const volatile atomic<_Tp>* __o, typename atomic<_Tp>::valu
 }
 
 template <class _Tp>
-_LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
+_LIBCPP_AVAILABILITY_SYNC _LIBCPP_CONSTEXPR _LIBCPP_HIDE_FROM_ABI void
 atomic_wait_explicit(const atomic<_Tp>* __o, typename atomic<_Tp>::value_type __v, memory_order __m) _NOEXCEPT
     _LIBCPP_CHECK_LOAD_MEMORY_ORDER(__m) {
   return __o->wait(__v, __m);
@@ -467,7 +467,7 @@ atomic_notify_one(volatile atomic<_Tp>* __o) _NOEXCEPT {
   __o->notify_one();
 }
 template <class _Tp>
-_LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
+_LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_CONSTEXPR _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
 atomic_notify_one(atomic<_Tp>* __o) _NOEXCEPT {
   __o->notify_one();
 }
@@ -480,7 +480,7 @@ atomic_notify_all(volatile atomic<_Tp>* __o) _NOEXCEPT {
   __o->notify_all();
 }
 template <class _Tp>
-_LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
+_LIBCPP_DEPRECATED_ATOMIC_SYNC _LIBCPP_CONSTEXPR _LIBCPP_AVAILABILITY_SYNC _LIBCPP_HIDE_FROM_ABI void
 atomic_notify_all(atomic<_Tp>* __o) _NOEXCEPT {
   __o->notify_all();
 }
