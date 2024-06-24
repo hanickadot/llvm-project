@@ -28,23 +28,23 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 struct atomic_flag {
   __cxx_atomic_impl<_LIBCPP_ATOMIC_FLAG_TYPE> __a_;
 
-  _LIBCPP_HIDE_FROM_ABI bool test(memory_order __m = memory_order_seq_cst) const volatile _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool test(memory_order __m = memory_order_seq_cst) const volatile _NOEXCEPT {
     return _LIBCPP_ATOMIC_FLAG_TYPE(true) == __cxx_atomic_load(&__a_, __m);
   }
-  _LIBCPP_HIDE_FROM_ABI bool test(memory_order __m = memory_order_seq_cst) const _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool test(memory_order __m = memory_order_seq_cst) const _NOEXCEPT {
     return _LIBCPP_ATOMIC_FLAG_TYPE(true) == __cxx_atomic_load(&__a_, __m);
   }
 
-  _LIBCPP_HIDE_FROM_ABI bool test_and_set(memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool test_and_set(memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT {
     return __cxx_atomic_exchange(&__a_, _LIBCPP_ATOMIC_FLAG_TYPE(true), __m);
   }
-  _LIBCPP_HIDE_FROM_ABI bool test_and_set(memory_order __m = memory_order_seq_cst) _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool test_and_set(memory_order __m = memory_order_seq_cst) _NOEXCEPT {
     return __cxx_atomic_exchange(&__a_, _LIBCPP_ATOMIC_FLAG_TYPE(true), __m);
   }
-  _LIBCPP_HIDE_FROM_ABI void clear(memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void clear(memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT {
     __cxx_atomic_store(&__a_, _LIBCPP_ATOMIC_FLAG_TYPE(false), __m);
   }
-  _LIBCPP_HIDE_FROM_ABI void clear(memory_order __m = memory_order_seq_cst) _NOEXCEPT {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void clear(memory_order __m = memory_order_seq_cst) _NOEXCEPT {
     __cxx_atomic_store(&__a_, _LIBCPP_ATOMIC_FLAG_TYPE(false), __m);
   }
 
@@ -84,7 +84,7 @@ struct atomic_flag {
 
 template <>
 struct __atomic_waitable_traits<atomic_flag> {
-  static _LIBCPP_HIDE_FROM_ABI _LIBCPP_ATOMIC_FLAG_TYPE __atomic_load(const atomic_flag& __a, memory_order __order) {
+  static _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _LIBCPP_ATOMIC_FLAG_TYPE __atomic_load(const atomic_flag& __a, memory_order __order) {
     return std::__cxx_atomic_load(&__a.__a_, __order);
   }
 
@@ -93,54 +93,54 @@ struct __atomic_waitable_traits<atomic_flag> {
     return std::__cxx_atomic_load(&__a.__a_, __order);
   }
 
-  static _LIBCPP_HIDE_FROM_ABI const __cxx_atomic_impl<_LIBCPP_ATOMIC_FLAG_TYPE>*
+  static _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR const __cxx_atomic_impl<_LIBCPP_ATOMIC_FLAG_TYPE>*
   __atomic_contention_address(const atomic_flag& __a) {
     return std::addressof(__a.__a_);
   }
 
-  static _LIBCPP_HIDE_FROM_ABI const volatile __cxx_atomic_impl<_LIBCPP_ATOMIC_FLAG_TYPE>*
+  static _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR const volatile __cxx_atomic_impl<_LIBCPP_ATOMIC_FLAG_TYPE>*
   __atomic_contention_address(const volatile atomic_flag& __a) {
     return std::addressof(__a.__a_);
   }
 };
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test(const volatile atomic_flag* __o) _NOEXCEPT { return __o->test(); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test(const volatile atomic_flag* __o) _NOEXCEPT { return __o->test(); }
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test(const atomic_flag* __o) _NOEXCEPT { return __o->test(); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test(const atomic_flag* __o) _NOEXCEPT { return __o->test(); }
 
-inline _LIBCPP_HIDE_FROM_ABI bool
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
 atomic_flag_test_explicit(const volatile atomic_flag* __o, memory_order __m) _NOEXCEPT {
   return __o->test(__m);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test_explicit(const atomic_flag* __o, memory_order __m) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test_explicit(const atomic_flag* __o, memory_order __m) _NOEXCEPT {
   return __o->test(__m);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test_and_set(volatile atomic_flag* __o) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test_and_set(volatile atomic_flag* __o) _NOEXCEPT {
   return __o->test_and_set();
 }
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test_and_set(atomic_flag* __o) _NOEXCEPT { return __o->test_and_set(); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test_and_set(atomic_flag* __o) _NOEXCEPT { return __o->test_and_set(); }
 
-inline _LIBCPP_HIDE_FROM_ABI bool
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
 atomic_flag_test_and_set_explicit(volatile atomic_flag* __o, memory_order __m) _NOEXCEPT {
   return __o->test_and_set(__m);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI bool atomic_flag_test_and_set_explicit(atomic_flag* __o, memory_order __m) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool atomic_flag_test_and_set_explicit(atomic_flag* __o, memory_order __m) _NOEXCEPT {
   return __o->test_and_set(__m);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI void atomic_flag_clear(volatile atomic_flag* __o) _NOEXCEPT { __o->clear(); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void atomic_flag_clear(volatile atomic_flag* __o) _NOEXCEPT { __o->clear(); }
 
-inline _LIBCPP_HIDE_FROM_ABI void atomic_flag_clear(atomic_flag* __o) _NOEXCEPT { __o->clear(); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void atomic_flag_clear(atomic_flag* __o) _NOEXCEPT { __o->clear(); }
 
-inline _LIBCPP_HIDE_FROM_ABI void atomic_flag_clear_explicit(volatile atomic_flag* __o, memory_order __m) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void atomic_flag_clear_explicit(volatile atomic_flag* __o, memory_order __m) _NOEXCEPT {
   __o->clear(__m);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI void atomic_flag_clear_explicit(atomic_flag* __o, memory_order __m) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void atomic_flag_clear_explicit(atomic_flag* __o, memory_order __m) _NOEXCEPT {
   __o->clear(__m);
 }
 

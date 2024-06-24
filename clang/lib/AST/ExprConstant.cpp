@@ -7942,24 +7942,98 @@ public:
     return true;
   }
   
+  static bool CompareExchangeAtomicValue(const AtomicExpr *E, APValue & Result, EvalInfo &Info) {
+    // dereference _Atomic * (atomic value)
+    LValue AtomicLV;
+    QualType AtomicTy = E->getPtr()->getType()->getPointeeType().getAtomicUnqualifiedType();
+    if (!EvaluatePointer(E->getPtr(), AtomicLV, Info)) {
+      return false;
+    }
+    
+    // dereference T * (expected value)
+    LValue ExpectedLV;
+    QualType ExpectedTy = E->getVal1()->getType()->getPointeeType();
+    if (!EvaluatePointer(E->getVal1(), ExpectedLV, Info)) {
+      return false;
+    }
+    
+    // get values for atomic and expected
+    APValue AtomicVal;
+    APValue ExpectedVal;
+    
+    // convert pointer to value
+    if (!handleLValueToRValueConversion(Info, E->getPtr(), AtomicTy, AtomicLV, AtomicVal)) {
+      return false;
+    }
+    
+    if (!handleLValueToRValueConversion(Info, E->getVal1(), ExpectedTy, ExpectedLV, ExpectedVal)) {
+      return false;
+    }
+    
+    bool DoExchange = false;
+    
+    std::cout << "AtomicTy: " << AtomicTy.getAsString() << "\n";
+    std::cout << "ExpectedTy: " << ExpectedTy.getAsString() << "\n";
+    
+    // compare atomic<int> and friends
+    if (AtomicTy->isIntegralOrEnumerationType() && ExpectedTy->isIntegralOrEnumerationType()) {
+      std::cout << "[isIntegralOrEnumerationType]\n";
+      APSInt AtomicInt = AtomicVal.getInt();
+      APSInt ExpectedInt = ExpectedVal.getInt();
+      if (AtomicInt == ExpectedInt) {
+        DoExchange = true;
+      }
+    } else {
+      // TODO
+      std::cout << "[unknown comparison?]\n";
+    }
+    
+    
+    if (DoExchange) {
+      // if values are same do the exchange with replacement value
+      // but first I must evaluate the replacement value
+      APValue Replacement;
+      if (!Evaluate(Replacement, Info, E->getVal2())) {
+        return false;
+      }
+    
+      // and assign it to atomic
+      if (!handleAssignment(Info, E, AtomicLV, AtomicTy, Replacement)) {
+        return false;
+      }
+      
+    }
+    
+    // to expected pointer I need to put previous value in atomic
+    if (!handleAssignment(Info, E, ExpectedLV, ExpectedTy, AtomicVal)) {
+      return false;
+    }
+    
+    // and return boolean if I did the exchange
+    Result = APValue(Info.Ctx.MakeIntValue(DoExchange, E->getType()));
+    return true;
+  }
+  
   bool VisitAtomicExpr(const AtomicExpr *E) {
     APValue LocalResult;
     switch (E->getOp()) {
       default:
         return Error(E);
       case AtomicExpr::AO__c11_atomic_load:
+      case AtomicExpr::AO__atomic_load_n:
         if (!LoadAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
       case AtomicExpr::AO__c11_atomic_compare_exchange_strong:
       case AtomicExpr::AO__c11_atomic_compare_exchange_weak:
-        // TODO compare + conditional exchange
-        if (!LoadAtomicValue(E, LocalResult, Info)) {
+      case AtomicExpr::AO__atomic_compare_exchange_n:
+        if (!CompareExchangeAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
       case AtomicExpr::AO__c11_atomic_exchange:
+      case AtomicExpr::AO__atomic_exchange_n:
         if (!LoadAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
@@ -15621,7 +15695,10 @@ public:
       return Error(E);
     case AtomicExpr::AO__c11_atomic_init:
     case AtomicExpr::AO__c11_atomic_store:
+    case AtomicExpr::AO__atomic_store_n:
       return StoreAtomicValue(E, Info);
+    case AtomicExpr::AO__atomic_load:
+      return Error(E);
     }
   }
 
