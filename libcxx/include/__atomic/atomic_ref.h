@@ -128,19 +128,29 @@ public:
         __order == memory_order::relaxed || __order == memory_order::consume || __order == memory_order::acquire ||
             __order == memory_order::seq_cst,
         "atomic_ref: memory order argument to atomic load operation is invalid");
-    alignas(_Tp) byte __mem[sizeof(_Tp)];
-    auto* __ret = reinterpret_cast<_Tp*>(__mem);
-    __atomic_load(__ptr_, __ret, std::__to_gcc_order(__order));
-    return *__ret;
+    if consteval {
+      return *__ptr_;
+    } else {
+      alignas(_Tp) byte __mem[sizeof(_Tp)];
+      auto* __ret = reinterpret_cast<_Tp*>(__mem);
+      __atomic_load(__ptr_, __ret, std::__to_gcc_order(__order));
+      return *__ret;
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR operator _Tp() const noexcept { return load(); }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp exchange(_Tp __desired, memory_order __order = memory_order::seq_cst) const noexcept {
-    alignas(_Tp) byte __mem[sizeof(_Tp)];
-    auto* __ret = reinterpret_cast<_Tp*>(__mem);
-    __atomic_exchange(__ptr_, __clear_padding(__desired), __ret, std::__to_gcc_order(__order));
-    return *__ret;
+    if consteval {
+      _Tp tmp = *__ptr_;
+      *__ptr_ = __desired;
+      return tmp;
+    } else {
+      alignas(_Tp) byte __mem[sizeof(_Tp)];
+      auto* __ret = reinterpret_cast<_Tp*>(__mem);
+      __atomic_exchange(__ptr_, __clear_padding(__desired), __ret, std::__to_gcc_order(__order));
+      return *__ret;
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
@@ -176,13 +186,23 @@ public:
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
   compare_exchange_weak(_Tp& __expected, _Tp __desired, memory_order __order = memory_order::seq_cst) const noexcept {
-    return __compare_exchange(
-        __ptr_,
-        std::addressof(__expected),
-        std::addressof(__desired),
-        true,
-        std::__to_gcc_order(__order),
-        std::__to_gcc_failure_order(__order));
+    if consteval {
+      if (*__ptr_ == __expected) {
+        __expected = *__ptr_;
+        *__ptr_ = __desired;
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      return __compare_exchange(
+          __ptr_,
+          std::addressof(__expected),
+          std::addressof(__desired),
+          true,
+          std::__to_gcc_order(__order),
+          std::__to_gcc_failure_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
   compare_exchange_strong(_Tp& __expected, _Tp __desired, memory_order __order = memory_order::seq_cst) const noexcept {
@@ -225,8 +245,8 @@ struct atomic_ref : public __atomic_ref_base<_Tp> {
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR explicit atomic_ref(_Tp& __obj) : __base(__obj) {
     _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
-        reinterpret_cast<uintptr_t>(std::addressof(__obj)) % __base::required_alignment == 0,
-        "atomic_ref ctor: referenced object must be aligned to required_alignment");
+      __builtin_is_aligned(std::addressof(__obj), __base::required_alignment),
+      "atomic_ref ctor: referenced object must be aligned to required_alignment");
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR atomic_ref(const atomic_ref&) noexcept = default;
@@ -294,7 +314,7 @@ struct atomic_ref<_Tp> : public __atomic_ref_base<_Tp> {
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR explicit atomic_ref(_Tp& __obj) : __base(__obj) {
     _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
-        reinterpret_cast<uintptr_t>(std::addressof(__obj)) % __base::required_alignment == 0,
+        __builtin_is_aligned(std::addressof(__obj), __base::required_alignment),
         "atomic_ref ctor: referenced object must be aligned to required_alignment");
   }
 

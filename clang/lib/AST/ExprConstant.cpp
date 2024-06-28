@@ -7904,23 +7904,65 @@ public:
     return StmtVisitorTy::Visit(Source);
   }
   
+  static bool EvaluateOrder(const Expr * E, EvalInfo &Info) {
+    // we ignore order
+    [[maybe_unused]] APSInt Order;
+    if (!EvaluateInteger(E, Order, Info)) {
+      std::cout << "!EvaluateInteger(E->getOrder(), Order, Info)\n";
+      return false;
+    }
+    
+    return true;
+  }
+  
+  static bool ReadAtomicPtr(const AtomicExpr *E, APValue & Result, EvalInfo &Info) {
+    LValue AtomicLV;
+    if (!EvaluatePointer(E->getPtr(), AtomicLV, Info)) {
+      return false;
+    }
+    
+    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), AtomicLV, Result)) {
+      return false;
+    }
+    
+    return true;
+  }
+  
   static bool LoadAtomicValue(const AtomicExpr *E, APValue & Result, EvalInfo &Info) {
-    LValue Value;
-    if (!EvaluatePointer(E->getPtr(), Value, Info)) {
+    if (!ReadAtomicPtr(E, Result, Info)) {
       return false;
     }
 
     // we ignore order
-    [[maybe_unused]] APSInt Order;
-    if (!EvaluateInteger(E->getOrder(), Order, Info)) {
+    if (!EvaluateOrder(E->getOrder(), Info)) {
       return false;
     }
 
-    // convert pointer to value
-    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), Value, Result)) {
+    return true;
+  }
+  
+  static bool LoadAtomicValueInto(const AtomicExpr *E, EvalInfo &Info, const Expr *Target) { 
+    APValue AtomicVal;
+    if (!ReadAtomicPtr(E, AtomicVal, Info)) {
       return false;
     }
-
+    
+    LValue TargetLV;
+    QualType TargetTy = Target->getType()->getPointeeType();
+    if (!EvaluatePointer(Target, TargetLV, Info)) {
+      return false;
+    }
+    
+    // we ignore order
+    if (!EvaluateOrder(E->getOrder(), Info)) {
+      return false;
+    }
+    
+    // and assign it to atomic
+    if (!handleAssignment(Info, E, TargetLV, TargetTy, AtomicVal)) {
+      return false;
+    }
+    
     return true;
   }
   
@@ -7936,6 +7978,30 @@ public:
     }
     
     if (!handleAssignment(Info, E, LV, E->getVal1()->getType(), NewVal)) {
+      return false;
+    }
+    
+    return true;
+  }
+  
+  static bool StoreAtomicValueFrom(const AtomicExpr *E, EvalInfo &Info, const Expr * Source) {
+    LValue AtomicLV;
+    if (!EvaluatePointer(E->getPtr(), AtomicLV, Info)) {
+      return false;
+    }
+    
+    LValue SourceLV;
+    QualType SourceTy = Source->getType()->getPointeeType();
+    if (!EvaluatePointer(Source, SourceLV, Info)) {
+      return false;
+    }
+    
+    APValue SourceVal;
+    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), SourceLV, SourceVal)) {
+      return false;
+    }
+    
+    if (!handleAssignment(Info, E, AtomicLV, SourceTy, SourceVal)) {
       return false;
     }
     
@@ -8032,6 +8098,9 @@ public:
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
+      case AtomicExpr::AO__atomic_compare_exchange:
+        // TODO implement
+        return false;
       case AtomicExpr::AO__c11_atomic_exchange:
       case AtomicExpr::AO__atomic_exchange_n:
         if (!LoadAtomicValue(E, LocalResult, Info)) {
@@ -15697,8 +15766,18 @@ public:
     case AtomicExpr::AO__c11_atomic_store:
     case AtomicExpr::AO__atomic_store_n:
       return StoreAtomicValue(E, Info);
+    case AtomicExpr::AO__atomic_store:
+      return StoreAtomicValueFrom(E, Info, E->getVal1());
     case AtomicExpr::AO__atomic_load:
-      return Error(E);
+      return LoadAtomicValueInto(E, Info, E->getVal1());
+    case AtomicExpr::AO__atomic_exchange:
+      if (!LoadAtomicValueInto(E, Info, E->getVal2())) {
+        return false;
+      }
+      if (!StoreAtomicValueFrom(E, Info, E->getVal1())) {
+        return false;
+      }
+      return true;
     }
   }
 
