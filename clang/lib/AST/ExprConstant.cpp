@@ -7941,31 +7941,6 @@ public:
     return true;
   }
   
-  static bool LoadAtomicValueInto(const AtomicExpr *E, EvalInfo &Info, const Expr *Target) { 
-    APValue AtomicVal;
-    if (!ReadAtomicPtr(E, AtomicVal, Info)) {
-      return false;
-    }
-    
-    LValue TargetLV;
-    QualType TargetTy = Target->getType()->getPointeeType();
-    if (!EvaluatePointer(Target, TargetLV, Info)) {
-      return false;
-    }
-    
-    // we ignore order
-    if (!EvaluateOrder(E->getOrder(), Info)) {
-      return false;
-    }
-    
-    // and assign it to atomic
-    if (!handleAssignment(Info, E, TargetLV, TargetTy, AtomicVal)) {
-      return false;
-    }
-    
-    return true;
-  }
-  
   static bool StoreAtomicValue(const AtomicExpr *E, EvalInfo &Info) {
     LValue LV;
     if (!EvaluatePointer(E->getPtr(), LV, Info)) {
@@ -7978,30 +7953,6 @@ public:
     }
     
     if (!handleAssignment(Info, E, LV, E->getVal1()->getType(), NewVal)) {
-      return false;
-    }
-    
-    return true;
-  }
-  
-  static bool StoreAtomicValueFrom(const AtomicExpr *E, EvalInfo &Info, const Expr * Source) {
-    LValue AtomicLV;
-    if (!EvaluatePointer(E->getPtr(), AtomicLV, Info)) {
-      return false;
-    }
-    
-    LValue SourceLV;
-    QualType SourceTy = Source->getType()->getPointeeType();
-    if (!EvaluatePointer(Source, SourceLV, Info)) {
-      return false;
-    }
-    
-    APValue SourceVal;
-    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), SourceLV, SourceVal)) {
-      return false;
-    }
-    
-    if (!handleAssignment(Info, E, AtomicLV, SourceTy, SourceVal)) {
       return false;
     }
     
@@ -8038,20 +7989,20 @@ public:
     
     bool DoExchange = false;
     
-    std::cout << "AtomicTy: " << AtomicTy.getAsString() << "\n";
-    std::cout << "ExpectedTy: " << ExpectedTy.getAsString() << "\n";
-    
     // compare atomic<int> and friends
     if (AtomicTy->isIntegralOrEnumerationType() && ExpectedTy->isIntegralOrEnumerationType()) {
-      std::cout << "[isIntegralOrEnumerationType]\n";
       APSInt AtomicInt = AtomicVal.getInt();
       APSInt ExpectedInt = ExpectedVal.getInt();
       if (AtomicInt == ExpectedInt) {
         DoExchange = true;
       }
     } else {
-      // TODO
+      // TODO float, pointers
       std::cout << "[unknown comparison?]\n";
+      std::cout << "AtomicTy: " << AtomicTy.getAsString() << "\n";
+      std::cout << "ExpectedTy: " << ExpectedTy.getAsString() << "\n";
+    
+    
     }
     
     
@@ -8086,23 +8037,17 @@ public:
       default:
         return Error(E);
       case AtomicExpr::AO__c11_atomic_load:
-      case AtomicExpr::AO__atomic_load_n:
         if (!LoadAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
       case AtomicExpr::AO__c11_atomic_compare_exchange_strong:
       case AtomicExpr::AO__c11_atomic_compare_exchange_weak:
-      case AtomicExpr::AO__atomic_compare_exchange_n:
         if (!CompareExchangeAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
-      case AtomicExpr::AO__atomic_compare_exchange:
-        // TODO implement
-        return false;
       case AtomicExpr::AO__c11_atomic_exchange:
-      case AtomicExpr::AO__atomic_exchange_n:
         if (!LoadAtomicValue(E, LocalResult, Info)) {
           return Error(E);
         }
@@ -15764,20 +15709,7 @@ public:
       return Error(E);
     case AtomicExpr::AO__c11_atomic_init:
     case AtomicExpr::AO__c11_atomic_store:
-    case AtomicExpr::AO__atomic_store_n:
       return StoreAtomicValue(E, Info);
-    case AtomicExpr::AO__atomic_store:
-      return StoreAtomicValueFrom(E, Info, E->getVal1());
-    case AtomicExpr::AO__atomic_load:
-      return LoadAtomicValueInto(E, Info, E->getVal1());
-    case AtomicExpr::AO__atomic_exchange:
-      if (!LoadAtomicValueInto(E, Info, E->getVal2())) {
-        return false;
-      }
-      if (!StoreAtomicValueFrom(E, Info, E->getVal1())) {
-        return false;
-      }
-      return true;
     }
   }
 

@@ -114,7 +114,11 @@ public:
     _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
         __order == memory_order::relaxed || __order == memory_order::release || __order == memory_order::seq_cst,
         "atomic_ref: memory order argument to atomic store operation is invalid");
-    __atomic_store(__ptr_, __clear_padding(__desired), std::__to_gcc_order(__order));
+    if consteval {
+      *__ptr_ = __desired;
+    } else {
+      __atomic_store(__ptr_, __clear_padding(__desired), std::__to_gcc_order(__order));
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp operator=(_Tp __desired) const noexcept {
@@ -192,6 +196,7 @@ public:
         *__ptr_ = __desired;
         return true;
       } else {
+        __expected = *__ptr_;
         return false;
       }
     } else {
@@ -206,25 +211,50 @@ public:
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
   compare_exchange_strong(_Tp& __expected, _Tp __desired, memory_order __order = memory_order::seq_cst) const noexcept {
-    return __compare_exchange(
-        __ptr_,
-        std::addressof(__expected),
-        std::addressof(__desired),
-        false,
-        std::__to_gcc_order(__order),
-        std::__to_gcc_failure_order(__order));
+    if consteval {
+      if (*__ptr_ == __expected) {
+        __expected = *__ptr_;
+        *__ptr_ = __desired;
+        return true;
+      } else {
+        __expected = *__ptr_;
+        return false;
+      }
+    } else {
+      return __compare_exchange(
+          __ptr_,
+          std::addressof(__expected),
+          std::addressof(__desired),
+          false,
+          std::__to_gcc_order(__order),
+          std::__to_gcc_failure_order(__order));
+    }
   }
 
-  _LIBCPP_HIDE_FROM_ABI void wait(_Tp __old, memory_order __order = memory_order::seq_cst) const noexcept
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void wait(_Tp __old, memory_order __order = memory_order::seq_cst) const noexcept
       _LIBCPP_CHECK_WAIT_MEMORY_ORDER(__order) {
-    _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
-        __order == memory_order::relaxed || __order == memory_order::consume || __order == memory_order::acquire ||
-            __order == memory_order::seq_cst,
-        "atomic_ref: memory order argument to atomic wait operation is invalid");
-    std::__atomic_wait(*this, __old, __order);
+    if consteval {
+      if (*__ptr_ != __old) {
+        __builtin_trap();
+      }
+    } else {
+      _LIBCPP_ASSERT_ARGUMENT_WITHIN_DOMAIN(
+          __order == memory_order::relaxed || __order == memory_order::consume || __order == memory_order::acquire ||
+              __order == memory_order::seq_cst,
+          "atomic_ref: memory order argument to atomic wait operation is invalid");
+      std::__atomic_wait(*this, __old, __order);
+    }
   }
-  _LIBCPP_HIDE_FROM_ABI void notify_one() const noexcept { std::__atomic_notify_one(*this); }
-  _LIBCPP_HIDE_FROM_ABI void notify_all() const noexcept { std::__atomic_notify_all(*this); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void notify_one() const noexcept { 
+    if !consteval { 
+      std::__atomic_notify_one(*this);
+    }
+  }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR void notify_all() const noexcept {
+    if !consteval { 
+      std::__atomic_notify_all(*this);
+    }
+  }
 };
 
 template <class _Tp>
