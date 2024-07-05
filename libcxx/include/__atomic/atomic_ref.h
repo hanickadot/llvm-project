@@ -164,13 +164,25 @@ public:
         __failure == memory_order::relaxed || __failure == memory_order::consume ||
             __failure == memory_order::acquire || __failure == memory_order::seq_cst,
         "atomic_ref: failure memory order argument to weak atomic compare-and-exchange operation is invalid");
-    return __compare_exchange(
-        __ptr_,
-        std::addressof(__expected),
-        std::addressof(__desired),
-        true,
-        std::__to_gcc_order(__success),
-        std::__to_gcc_order(__failure));
+    if consteval {
+      const _Tp __original = *__ptr_;
+      if (__original == __expected) {
+        *__ptr_ = __desired;
+        __expected = __original;
+        return true;
+      } else {
+        __expected = __original;
+        return false;
+      }
+    } else {
+      return __compare_exchange(
+          __ptr_,
+          std::addressof(__expected),
+          std::addressof(__desired),
+          true,
+          std::__to_gcc_order(__success),
+          std::__to_gcc_order(__failure));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
   compare_exchange_strong(_Tp& __expected, _Tp __desired, memory_order __success, memory_order __failure) const noexcept
@@ -179,13 +191,25 @@ public:
         __failure == memory_order::relaxed || __failure == memory_order::consume ||
             __failure == memory_order::acquire || __failure == memory_order::seq_cst,
         "atomic_ref: failure memory order argument to strong atomic compare-and-exchange operation is invalid");
-    return __compare_exchange(
-        __ptr_,
-        std::addressof(__expected),
-        std::addressof(__desired),
-        false,
-        std::__to_gcc_order(__success),
-        std::__to_gcc_order(__failure));
+    if consteval {
+      const _Tp __original = *__ptr_;
+      if (__original == __expected) {
+        *__ptr_ = __desired;
+        __expected = __original;
+        return true;
+      } else {
+        __expected = __original;
+        return false;
+      }
+    } else {
+      return __compare_exchange(
+          __ptr_,
+          std::addressof(__expected),
+          std::addressof(__desired),
+          false,
+          std::__to_gcc_order(__success),
+          std::__to_gcc_order(__failure));
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
@@ -309,19 +333,49 @@ struct atomic_ref<_Tp> : public __atomic_ref_base<_Tp> {
   atomic_ref& operator=(const atomic_ref&) = delete;
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp fetch_add(_Tp __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_add(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    if consteval {
+      const auto tmp = *this->__ptr_;
+      *this->__ptr_ += __arg;
+      return tmp;
+    } else {
+      return __atomic_fetch_add(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp fetch_sub(_Tp __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_sub(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    if consteval {
+      const auto tmp = *this->__ptr_;
+      *this->__ptr_ -= __arg;
+      return tmp;
+    } else {
+      return __atomic_fetch_sub(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp fetch_and(_Tp __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_and(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    if consteval {
+      const auto tmp = *this->__ptr_;
+      *this->__ptr_ &= __arg;
+      return tmp;
+    } else {
+      return __atomic_fetch_and(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp fetch_or(_Tp __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_or(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    if consteval {
+      const auto tmp = *this->__ptr_;
+      *this->__ptr_ |= __arg;
+      return tmp;
+    } else {
+      return __atomic_fetch_or(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp fetch_xor(_Tp __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_xor(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    if consteval {
+      const auto tmp = *this->__ptr_;
+      *this->__ptr_ ^= __arg;
+      return tmp;
+    } else {
+      return __atomic_fetch_xor(this->__ptr_, __arg, std::__to_gcc_order(__order));
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp operator++(int) const noexcept { return fetch_add(_Tp(1)); }
@@ -388,10 +442,22 @@ struct atomic_ref<_Tp*> : public __atomic_ref_base<_Tp*> {
   atomic_ref& operator=(const atomic_ref&) = delete;
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp* fetch_add(ptrdiff_t __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_add(this->__ptr_, __arg * sizeof(_Tp), std::__to_gcc_order(__order));
+    if consteval {
+      auto __original = *(this->__ptr_);
+      *(this->__ptr_) += __arg;
+      return __original;
+    } else {
+      return __atomic_fetch_add(this->__ptr_, __arg * sizeof(_Tp), std::__to_gcc_order(__order));
+    }
   }
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp* fetch_sub(ptrdiff_t __arg, memory_order __order = memory_order_seq_cst) const noexcept {
-    return __atomic_fetch_sub(this->__ptr_, __arg * sizeof(_Tp), std::__to_gcc_order(__order));
+    if consteval {
+      auto __original = *(this->__ptr_);
+      *(this->__ptr_) -= __arg;
+      return __original;
+    } else {
+      return __atomic_fetch_sub(this->__ptr_, __arg * sizeof(_Tp), std::__to_gcc_order(__order));
+    }
   }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp* operator++(int) const noexcept { return fetch_add(1); }

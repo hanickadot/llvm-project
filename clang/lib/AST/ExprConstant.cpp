@@ -1899,6 +1899,9 @@ static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
 // Misc utilities
 //===----------------------------------------------------------------------===//
 
+static bool isOnePastTheEndOfCompleteObject(const ASTContext &Ctx,
+                                          const LValue &LV);
+
 /// Negate an APSInt in place, converting it to a signed form if necessary, and
 /// preserving its value (by extending by up to one bit as needed).
 static void negateAsSigned(APSInt &Int) {
@@ -7941,6 +7944,122 @@ public:
     return true;
   }
   
+  static bool FetchAtomicOp(const AtomicExpr *E, APValue & Result, EvalInfo &Info) {
+    LValue AtomicLV;
+    QualType AtomicTy = E->getPtr()->getType()->getPointeeType().getAtomicUnqualifiedType();
+    if (!EvaluatePointer(E->getPtr(), AtomicLV, Info)) {
+      return false;
+    }
+    
+    auto & AtomicVal = Result;
+    if (!handleLValueToRValueConversion(Info, E->getPtr(), E->getType(), AtomicLV, AtomicVal)) {
+      return false;
+    }
+    
+    const auto ResultType = E->getType();
+    
+    APValue ArgumentVal;
+    if (!Evaluate(ArgumentVal, Info, E->getVal1())) {
+      return false;
+    }
+    
+    APValue Replacement;
+    if (ResultType->isIntegralOrEnumerationType()) {
+      const APSInt AtomicInt = AtomicVal.getInt();
+      const APSInt ArgumentInt = ArgumentVal.getInt();
+      
+      switch (E->getOp()) {
+        case AtomicExpr::AO__c11_atomic_fetch_add: 
+          Replacement = APValue(AtomicInt + ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_sub:
+          Replacement = APValue(AtomicInt - ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_and:
+          Replacement = APValue(AtomicInt & ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_or: 
+          Replacement = APValue(AtomicInt | ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_xor:
+          Replacement = APValue(AtomicInt ^ ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_nand: 
+          Replacement = APValue(~(AtomicInt & ArgumentInt));
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_max: 
+          Replacement = APValue((AtomicInt > ArgumentInt) ? AtomicInt : ArgumentInt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_min: 
+          Replacement = APValue((AtomicInt < ArgumentInt) ? AtomicInt : ArgumentInt);
+          break;
+        default:
+          return false;
+      }
+    } else if (ResultType->isRealFloatingType()) {
+      const llvm::RoundingMode RM = getActiveRoundingMode(Info, E);
+      APFloat AtomicFlt = AtomicVal.getFloat();
+      const APFloat ArgumentFlt = ArgumentVal.getFloat();
+      APFloat::opStatus St;
+      
+      switch (E->getOp()) {
+        case AtomicExpr::AO__c11_atomic_fetch_add: 
+          St = AtomicFlt.add(ArgumentFlt, RM);
+          Replacement = APValue(AtomicFlt);
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_sub:
+          St = AtomicFlt.subtract(ArgumentFlt, RM);
+          Replacement = APValue(AtomicFlt);
+          break;
+        default:
+          return false;
+      }
+      
+      if (!checkFloatingPointResult(Info, E, St)) {
+        return false;
+      }
+    } else if (ResultType->isPointerType()) {
+      LValue AtomicPtr;
+      AtomicPtr.setFrom(Info.Ctx, AtomicVal);
+      
+      APSInt ArgumentInt = ArgumentVal.getInt();
+      
+      //
+      std::cout << AtomicTy.getAsString() << "\n";
+      
+      switch (E->getOp()) {
+        case AtomicExpr::AO__c11_atomic_fetch_add: 
+          if (!HandleLValueArrayAdjustment(Info, E, AtomicPtr, AtomicTy->getPointeeType(), ArgumentInt)) {
+            return false;
+          }
+          break;
+        case AtomicExpr::AO__c11_atomic_fetch_sub:
+          ArgumentInt.negate();
+          if (!HandleLValueArrayAdjustment(Info, E, AtomicPtr, AtomicTy->getPointeeType(), ArgumentInt)) {
+            return false;
+          }
+          break;
+        default:
+          return false;
+      }
+      
+      if (AtomicPtr.Designator.Invalid) {
+        std::cout << "[AtomicPtr.Invalid]\n";
+      }
+      
+      AtomicPtr.moveInto(Replacement); 
+    } else {
+      // not float,int,pointer?
+      return false;
+    }
+    
+    if (!handleAssignment(Info, E, AtomicLV, AtomicTy, Replacement)) {
+      return false;
+    }
+    
+    return true;
+  }
+  
   static bool StoreAtomicValue(const AtomicExpr *E, EvalInfo &Info) {
     LValue LV;
     if (!EvaluatePointer(E->getPtr(), LV, Info)) {
@@ -7991,20 +8110,80 @@ public:
     
     // compare atomic<int> and friends
     if (AtomicTy->isIntegralOrEnumerationType() && ExpectedTy->isIntegralOrEnumerationType()) {
-      APSInt AtomicInt = AtomicVal.getInt();
-      APSInt ExpectedInt = ExpectedVal.getInt();
+      const APSInt AtomicInt = AtomicVal.getInt();
+      const APSInt ExpectedInt = ExpectedVal.getInt();
       if (AtomicInt == ExpectedInt) {
         DoExchange = true;
       }
+    } else if (AtomicTy->isRealFloatingType() && ExpectedTy->isRealFloatingType()) {
+      const APFloat AtomicFlt = AtomicVal.getFloat();
+      const APFloat ExpectedFlt = ExpectedVal.getFloat();
+      if (AtomicFlt == ExpectedFlt) {
+        DoExchange = true;
+      }
+    } else if (AtomicTy->isPointerType() && ExpectedTy->isPointerType()) {
+      // get LValue of objects pointed to
+      LValue LHS;
+      LHS.setFrom(Info.Ctx, AtomicVal);
+      
+      LValue RHS;
+      RHS.setFrom(Info.Ctx, ExpectedVal);
+      
+      if (HasSameBase(LHS, RHS)) {
+        const CharUnits &LHSOffset = LHS.getLValueOffset();
+        const CharUnits &RHSOffset = RHS.getLValueOffset();
+
+        const unsigned PtrSize = Info.Ctx.getTypeSize(AtomicTy);
+        assert(PtrSize <= 64 && "Pointer width is larger than expected");
+        const uint64_t Mask = ~0ULL >> (64 - PtrSize);
+      
+        const uint64_t CompareLHS = LHSOffset.getQuantity() & Mask;
+        const uint64_t CompareRHS = RHSOffset.getQuantity() & Mask;
+      
+        if (CompareLHS == CompareRHS) {
+          DoExchange = true;
+        }
+      } else {
+        
+        // it's implementation-defined to compare distinct literals
+        // it's not constant-evaluation
+        if ((IsLiteralLValue(LHS) || IsLiteralLValue(RHS)) &&
+            LHS.Base && RHS.Base) {
+          return false;
+        }
+        
+        if (IsWeakLValue(LHS) || IsWeakLValue(RHS)) {
+          return false;
+        }
+        
+        if ((!LHS.Base && !LHS.Offset.isZero()) ||
+            (!RHS.Base && !RHS.Offset.isZero())) {
+          return false;
+        }
+        
+        if (LHS.Base && LHS.Offset.isZero() &&
+            isOnePastTheEndOfCompleteObject(Info.Ctx, RHS)) {
+          return false;
+        }
+        
+        if (RHS.Base && RHS.Offset.isZero() &&
+            isOnePastTheEndOfCompleteObject(Info.Ctx, LHS)) {
+          return false;
+        }
+        
+        if ((RHS.Base && isZeroSized(RHS)) ||
+            (LHS.Base && isZeroSized(LHS))) {
+          return false;
+        }
+        
+        // after all it's a different object
+        DoExchange = false;
+      }
+      
+      
     } else {
-      // TODO float, pointers
-      std::cout << "[unknown comparison?]\n";
-      std::cout << "AtomicTy: " << AtomicTy.getAsString() << "\n";
-      std::cout << "ExpectedTy: " << ExpectedTy.getAsString() << "\n";
-    
-    
+      return false;
     }
-    
     
     if (DoExchange) {
       // if values are same do the exchange with replacement value
@@ -8063,8 +8242,7 @@ public:
       case AtomicExpr::AO__c11_atomic_fetch_nand:
       case AtomicExpr::AO__c11_atomic_fetch_max:
       case AtomicExpr::AO__c11_atomic_fetch_min:
-        // TODO <op>
-        if (!LoadAtomicValue(E, LocalResult, Info)) {
+        if (!FetchAtomicOp(E, LocalResult, Info)) {
           return Error(E);
         }
         return DerivedSuccess(LocalResult, E);
