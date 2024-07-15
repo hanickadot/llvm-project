@@ -804,6 +804,8 @@ namespace {
     Kind getKind() const {
       if (auto *NE = dyn_cast<CXXNewExpr>(AllocExpr))
         return NE->isArray() ? ArrayNew : New;
+      if (auto *TE = dyn_cast<CXXThrowExpr>(AllocExpr))
+        return New; // FIXME
       assert(isa<CallExpr>(AllocExpr));
       return StdAllocator;
     }
@@ -890,7 +892,8 @@ namespace {
     
     struct UnrollingExceptionT {
       const CXXThrowExpr * expression;
-      APValue *valueFromThrow;
+      APValue * value;
+      APValue pointer;
       QualType type;
     };
     
@@ -1043,14 +1046,14 @@ namespace {
         std::cout << "CheckUnhandledExceptions: " << this->ExceptionUnrolling.size() << " exception(s)\n";
         auto & TopException = this->ExceptionUnrolling.top();
         
-        auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.valueFromThrow, *this);
+        auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
         
         
         
         if (Description) {
           this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << *Description;
         } else {
-          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.valueFromThrow->getAsString(Ctx, TopException.type);
+          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.value->getAsString(Ctx, TopException.type);
         }
         
         
@@ -1059,12 +1062,12 @@ namespace {
         while (!this->ExceptionUnrolling.empty()) {
           auto & TopException = this->ExceptionUnrolling.top();
           
-          auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.valueFromThrow, *this);
+          auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
         
           if (Description) {
             this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type <<*Description;
           } else {
-            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.valueFromThrow->getAsString(Ctx, TopException.type);
+            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.value->getAsString(Ctx, TopException.type);
           }
           
           this->ExceptionUnrolling.pop();
@@ -1949,6 +1952,10 @@ static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & In
 
 static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception);
 
+static std::optional<DynAlloc *> CheckDeleteKind(EvalInfo &Info, const Expr *E,
+                                                 const LValue &Pointer,
+                                                 DynAlloc::Kind DeallocKind);
+
 //===----------------------------------------------------------------------===//
 // Misc utilities
 //===----------------------------------------------------------------------===//
@@ -2082,7 +2089,7 @@ void CallStackFrame::describe(raw_ostream &Out) const {
 /// Evaluate an expression to see if it had side-effects, and discard its
 /// result.
 /// \return \c true if the caller should keep evaluating.
-[[nodiscard]] static bool EvaluateIgnoredValue(EvalInfo &Info, const Expr *E) {
+static bool EvaluateIgnoredValue(EvalInfo &Info, const Expr *E) {
   assert(!E->isValueDependent());
   APValue Scratch;
   if (!Evaluate(Scratch, Info, E))
@@ -5706,17 +5713,42 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
   case Stmt::CXXTryStmtClass:
     {
-      std::cout << "<try>";
+      //std::cout << "<try>";
       const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
       // Evaluate try blocks by evaluating all sub statements.
       //__builtin_debugtrap();
       const auto result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
       //tryStatement->getTryBlock()->dump();
-      std::cout << "result = " << result_to_string(result) << "\n";
+      //std::cout << "result = " << result_to_string(result) << "\n";
       
       if (result == ESR_Failed && !Info.ExceptionUnrolling.empty()) {
-        std::cout << "trying to handle...\n";
+        //std::cout << "trying to handle...\n";
         auto & TopException = Info.ExceptionUnrolling.top();
+        
+        auto deallocate_exception = [&]{
+          //std::cout << "\n\n------\n\n";
+          LValue LV;
+          LV.setFrom(Info.Ctx, TopException.pointer);
+          
+          std::optional<DynAlloc *> Alloc = CheckDeleteKind(Info, TopException.expression, LV, DynAlloc::New);
+          if (!Alloc) {
+            //std::cout << "failed to CheckDeleteKind\n";
+            return false;
+          }
+            
+          QualType AllocType = LV.Base.getDynamicAllocType();
+          
+          //std::cout << "AllocType: " << AllocType.getAsString() << "\n";
+          
+          if (!HandleDestruction(Info, S->getBeginLoc(), LV.getLValueBase(), (*Alloc)->Value, AllocType)) {
+            //std::cout << "failed to destruct exception!\n";
+            return false;
+          }
+          
+          Info.HeapAllocs.erase(LV.Base.get<DynamicAllocLValue>());
+          
+          return true;
+        };
         
         const QualType ExceptionType = TopException.type;
         //std::cout << "\nCatching exception...\n";
@@ -5726,19 +5758,19 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         
           // handle catch(...) right now
           if (!Catch->getExceptionDecl()) {
-            std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
-            Info.ExceptionUnrolling.pop(); // TODO ability to rethrow
+            //std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
+            
             // TODO deallocate object!
-            std::cout << "[exception pop]\n";
-            std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
             //std::cout << "catch(...)\n";
             auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
-            std::cout << "</try>";
+            deallocate_exception();
+            Info.ExceptionUnrolling.pop(); // TODO ability to rethrow
+            
+            //std::cout << "</try>";
             return result;
           }
           
-          std::cout << "non-generic handler...\n";
-        
+          
           const auto * CaughtType = Catch->getCaughtType()->getUnqualifiedDesugaredType();
           if (CaughtType->isReferenceType()) {
              CaughtType = CaughtType->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
@@ -5746,38 +5778,27 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         
           // skip incompatible handles...
           if (!IsCompatibleCatchHandler(CaughtType, ExceptionType)) {
-            std::cout << "[skipping]\n";
+            //std::cout << "[skipping]\n";
             continue;
           }
         
-        
-          std::cout << "[compatible handler]";
-          Info.ExceptionUnrolling.pop();
-          std::cout << "[exception pop]\n";
+          //std::cout << "non-generic handler...\n";
           
-          //std::cout << Catch->getCaughtType().getAsString() << " vs exc = " << ExceptionType.getAsString() << "\n";
-        
-          // create scope for variable to store/bind the exception
-          //FullExpressionRAII Scope(Info);
-        
-          //// FIXME: do it properly
-          //const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
-          //assert(exceptionVariableDecl->isExceptionVariable());
-          //
-          //AssignExceptionToCatchHandler(Result.ExceptionType, Result.Exception, exceptionVariableDecl, Info, nullptr);
-          //
-          //// and evaluate the handler
           auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
-          std::cout << "</try>";
+          deallocate_exception();
+          
+          Info.ExceptionUnrolling.pop();
+          
+          //std::cout << "</try>";
           return result;
         }
         // TODO rethrow 
         //std::cout << " (not caught)\n";
-        std::cout << "</try>\nfailed to handle...\n";
+        //std::cout << "</try>\nfailed to handle...\n";
         return ESR_Failed;
       }
       
-      std::cout << "</try non failed>\n";
+      //std::cout << "</try non failed>\n";
       return result;
     }
     
@@ -6989,7 +7010,8 @@ static bool HandleOperatorNewCall(EvalInfo &Info, const CallExpr *E,
     return false;
   bool IsNothrow = false;
   for (unsigned I = 1, N = E->getNumArgs(); I != N; ++I) {
-    EvaluateIgnoredValue(Info, E->getArg(I));
+    if (!EvaluateIgnoredValue(Info, E->getArg(I)))
+      return false;
     IsNothrow |= E->getType()->isNothrowT();
   }
 
@@ -7105,7 +7127,8 @@ bool HandleOperatorDeleteCall(EvalInfo &Info, const CallExpr *E) {
   if (!EvaluatePointer(E->getArg(0), Pointer, Info))
     return false;
   for (unsigned I = 1, N = E->getNumArgs(); I != N; ++I)
-    EvaluateIgnoredValue(Info, E->getArg(I));
+    if (!EvaluateIgnoredValue(Info, E->getArg(I))) 
+      return false;
 
   if (Pointer.Designator.Invalid)
     return false;
@@ -7964,15 +7987,20 @@ public:
     const Expr *ThrowExpr = E->getSubExpr();
     
     if (ThrowExpr) {
-      LValue LV;
-      APValue *Val = Info.createHeapAlloc(E, ThrowExpr->getType(), LV);
-      if (!Evaluate(*Val, Info, ThrowExpr)) {
+      LValue Result;
+      APValue * Val = Info.createHeapAlloc(E, ThrowExpr->getType(), Result);
+
+      if (!EvaluateInPlace(*Val, Info, Result, ThrowExpr)) {
         return false;
       }
-      Info.ExceptionUnrolling.emplace(EvalInfo::UnrollingExceptionT{E, Val, ThrowExpr->getType()});
-      std::cout << "[exception push]\n";
+
+      APValue ptr;
+      Result.moveInto(ptr);
+      Info.ExceptionUnrolling.emplace(EvalInfo::UnrollingExceptionT{E, Val, ptr, ThrowExpr->getType()});
+      
       return false;
     } else if (!Info.ExceptionUnrolling.empty()) {
+      // TODO rethrow
       return false;
     } else {
       CCEDiag(E, diag::note_constexpr_rethrowing_no_exception);
@@ -7986,7 +8014,9 @@ public:
       return Error(E);
 
     case BO_Comma:
-      VisitIgnoredValue(E->getLHS());
+      if (!VisitIgnoredValue(E->getLHS())) {
+        return false;
+      }
       return StmtVisitorTy::Visit(E->getRHS());
 
     case BO_PtrMemD:
@@ -8498,17 +8528,17 @@ public:
   }
 
   /// Visit a value which is evaluated, but whose value is ignored.
-  void VisitIgnoredValue(const Expr *E) {
-    EvaluateIgnoredValue(Info, E);
+  [[nodiscard]] bool VisitIgnoredValue(const Expr *E) {
+    return EvaluateIgnoredValue(Info, E);
   }
 
   /// Potentially visit a MemberExpr's base expression.
-  void VisitIgnoredBaseExpression(const Expr *E) {
+  [[nodiscard]] bool VisitIgnoredBaseExpression(const Expr *E) {
     // While MSVC doesn't evaluate the base expression, it does diagnose the
     // presence of side-effecting behavior.
     if (Info.getLangOpts().MSVCCompat && !E->HasSideEffects(Info.Ctx))
-      return;
-    VisitIgnoredValue(E);
+      return true;
+    return VisitIgnoredValue(E);
   }
 };
 
@@ -9000,14 +9030,18 @@ bool LValueExprEvaluator::VisitCXXUuidofExpr(const CXXUuidofExpr *E) {
 bool LValueExprEvaluator::VisitMemberExpr(const MemberExpr *E) {
   // Handle static data members.
   if (const VarDecl *VD = dyn_cast<VarDecl>(E->getMemberDecl())) {
-    VisitIgnoredBaseExpression(E->getBase());
+    if (!VisitIgnoredBaseExpression(E->getBase())) {
+      return false;
+    }
     return VisitVarDecl(E, VD);
   }
 
   // Handle static member functions.
   if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(E->getMemberDecl())) {
     if (MD->isStatic()) {
-      VisitIgnoredBaseExpression(E->getBase());
+      if (!VisitIgnoredBaseExpression(E->getBase())) {
+        return false;
+      }
       return Success(MD);
     }
   }
@@ -9271,7 +9305,9 @@ public:
     if (E->isExpressibleAsConstantInitializer())
       return Success(E);
     if (Info.noteFailure())
-      EvaluateIgnoredValue(Info, E->getSubExpr());
+      if (!EvaluateIgnoredValue(Info, E->getSubExpr())) {
+        return Error(E);
+      }
     return Error(E);
   }
   bool VisitAddrLabelExpr(const AddrLabelExpr *E)
@@ -9502,7 +9538,9 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
     return HandleDynamicCast(Info, cast<ExplicitCastExpr>(E), Result);
 
   case CK_NullToPointer:
-    VisitIgnoredValue(E->getSubExpr());
+    if (!VisitIgnoredValue(E->getSubExpr())) {
+      return false;
+    }
     return ZeroInitialization(E);
 
   case CK_IntegralToPointer: {
@@ -10240,22 +10278,29 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
   }
 
   if (ValueInit) {
+    std::cout << "[valueinit]\n";
     ImplicitValueInitExpr VIE(AllocType);
     if (!EvaluateInPlace(*Val, Info, Result, &VIE))
       return false;
   } else if (ResizedArrayILE) {
+    std::cout << "[ResizedArrayILE]\n";
     if (!EvaluateArrayNewInitList(Info, Result, *Val, ResizedArrayILE,
                                   AllocType))
       return false;
   } else if (ResizedArrayCCE) {
+    std::cout << "[ResizedArrayCCE]\n";
     if (!EvaluateArrayNewConstructExpr(Info, Result, *Val, ResizedArrayCCE,
                                        AllocType))
       return false;
   } else if (Init) {
+    std::cout << "[ResizedArrayCCE]\n"; 
     if (!EvaluateInPlace(*Val, Info, Result, Init))
       return false;
-  } else if (!handleDefaultInitValue(AllocType, *Val)) {
-    return false;
+  } else {
+    std::cout << "[defaultinit]\n"; 
+    if (!handleDefaultInitValue(AllocType, *Val)) {
+      return false;
+    }
   }
 
   // Array new returns a pointer to the first element, not a pointer to the
@@ -10309,7 +10354,9 @@ bool MemberPointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
     return ExprEvaluatorBaseTy::VisitCastExpr(E);
 
   case CK_NullToMemberPointer:
-    VisitIgnoredValue(E->getSubExpr());
+    if (!VisitIgnoredValue(E->getSubExpr())) {
+      return false;
+    }
     return ZeroInitialization(E);
 
   case CK_BaseToDerivedMemberPointer: {
@@ -11038,7 +11085,9 @@ VectorExprEvaluator::ZeroInitialization(const Expr *E) {
 }
 
 bool VectorExprEvaluator::VisitUnaryImag(const UnaryOperator *E) {
-  VisitIgnoredValue(E->getSubExpr());
+  if (!VisitIgnoredValue(E->getSubExpr())) {
+    return false;
+  }
   return ZeroInitialization(E);
 }
 
@@ -11751,7 +11800,9 @@ public:
   }
   bool VisitMemberExpr(const MemberExpr *E) {
     if (CheckReferencedDecl(E, E->getMemberDecl())) {
-      VisitIgnoredBaseExpression(E->getBase());
+      if (!VisitIgnoredBaseExpression(E->getBase())) {
+        return false;
+      }
       return true;
     }
 
@@ -14662,7 +14713,9 @@ bool IntExprEvaluator::VisitUnaryImag(const UnaryOperator *E) {
     return Success(LV.getComplexIntImag(), E);
   }
 
-  VisitIgnoredValue(E->getSubExpr());
+  if (!VisitIgnoredValue(E->getSubExpr())) {
+    return Error(E);
+  }
   return Success(0, E);
 }
 
@@ -15082,7 +15135,9 @@ bool FloatExprEvaluator::VisitUnaryImag(const UnaryOperator *E) {
     return true;
   }
 
-  VisitIgnoredValue(E->getSubExpr());
+  if (!VisitIgnoredValue(E->getSubExpr())) {
+    return false;
+  }
   const llvm::fltSemantics &Sem = Info.Ctx.getFloatTypeSemantics(E->getType());
   Result = llvm::APFloat::getZero(Sem);
   return true;
@@ -15753,7 +15808,9 @@ public:
     default:
       return ExprEvaluatorBaseTy::VisitCastExpr(E);
     case CK_NullToPointer:
-      VisitIgnoredValue(E->getSubExpr());
+      if (VisitIgnoredValue(E->getSubExpr())) {
+        return false;
+      }
       return ZeroInitialization(E);
     case CK_NonAtomicToAtomic:
       return This ? EvaluateInPlace(Result, Info, *This, E->getSubExpr())
@@ -15790,7 +15847,9 @@ public:
     default:
       return ExprEvaluatorBaseTy::VisitCastExpr(E);
     case CK_ToVoid:
-      VisitIgnoredValue(E->getSubExpr());
+      if (!VisitIgnoredValue(E->getSubExpr())) {
+        return false;
+      }
       return true;
     }
   }
