@@ -1896,6 +1896,8 @@ static bool EvaluateFixedPointOrInteger(const Expr *E, APFixedPoint &Result,
 static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
                                EvalInfo &Info);
 
+static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string>;
+
 //===----------------------------------------------------------------------===//
 // Misc utilities
 //===----------------------------------------------------------------------===//
@@ -15608,6 +15610,29 @@ public:
     case Builtin::BI__builtin_operator_delete:
       return HandleOperatorDeleteCall(Info, E);
 
+    case Builtin::BI__builtin_debugtrap:
+    case Builtin::BI__constexpr_breakpoint:
+      __builtin_debugtrap();
+      return true;
+    
+    case Builtin::BI__constexpr_print:
+    {
+      auto result = ConvertPointerToString(E->getArg(0), Info);
+      if (result) {
+        std::cout << "constexpr print: '" << *result << "'\n";
+      }
+      return result.has_value();
+    }
+    
+    case Builtin::BI__constexpr_error:
+    {
+      auto result = ConvertPointerToString(E->getArg(0), Info);
+      if (result) {
+        Info.FFDiag(E, diag::custom_constexpr_error) << *result;
+      }
+      return false;
+    }
+
     default:
       return false;
     }
@@ -17125,4 +17150,31 @@ bool Expr::tryEvaluateStrLen(uint64_t &Result, ASTContext &Ctx) const {
   Expr::EvalStatus Status;
   EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
   return EvaluateBuiltinStrLen(this, Result, Info);
+}
+
+static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string> {
+  LValue String;
+
+  if (!::EvaluatePointer(PointerExpression, String, Info))
+    return std::nullopt;
+
+  QualType CharTy = PointerExpression->getType()->getPointeeType();
+
+  std::string Result;
+
+  while (true) {
+    APValue Char;
+    if (!handleLValueToRValueConversion(Info, PointerExpression, CharTy, String, Char))
+      return std::nullopt;
+
+    APSInt C = Char.getInt();
+
+    if (C == 0) {
+      return Result;
+    }
+
+    Result.push_back(static_cast<char>(C.getExtValue()));
+    if (!HandleLValueArrayAdjustment(Info, PointerExpression, String, CharTy, 1))
+      return std::nullopt;
+  }
 }

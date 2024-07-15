@@ -1160,7 +1160,7 @@ def VerboseTrap : Builtin {
 
 def Debugtrap : Builtin {
   let Spellings = ["__builtin_debugtrap"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void()";
 }
 
@@ -4767,4 +4767,22 @@ def ArithmeticFence : LangBuiltin<"ALL_LANGUAGES"> {
   let Spellings = ["__arithmetic_fence"];
   let Attributes = [CustomTypeChecking, Constexpr];
   let Prototype = "void(...)";
+}
+
+def ConstexprBreakpoint: Builtin {
+  let Spellings = ["__constexpr_breakpoint"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void()";
+}
+
+def ConstexprPrint: Builtin {
+  let Spellings = ["__constexpr_print"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(char const*)";
+}
+
+def ConstexprError: Builtin {
+  let Spellings = ["__constexpr_error"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(char const*)";
 }
