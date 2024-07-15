@@ -64,6 +64,8 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <stack>
+#include <iostream>
 
 #define DEBUG_TYPE "exprconstant"
 
@@ -78,9 +80,11 @@ namespace {
   struct LValue;
   class CallStackFrame;
   class EvalInfo;
-
+  
   using SourceLocExprScopeGuard =
       CurrentSourceLocExprScope::SourceLocExprScopeGuard;
+
+  static auto ObtainStringContentFromWhatMember(const CXXThrowExpr * ThrowExpression, APValue & value, EvalInfo & Info) -> std::optional<std::string>;
 
   static QualType getType(APValue::LValueBase B) {
     return B.getType();
@@ -883,6 +887,14 @@ namespace {
     /// allocated. We use std::map here because we need stable addresses
     /// for the stored APValues.
     std::map<DynamicAllocLValue, DynAlloc, DynAllocOrder> HeapAllocs;
+    
+    struct UnrollingExceptionT {
+      const CXXThrowExpr * expression;
+      APValue *valueFromThrow;
+      QualType type;
+    };
+    
+    std::stack<UnrollingExceptionT> ExceptionUnrolling;
 
     /// The number of heap allocations performed so far in this evaluation.
     unsigned NumHeapAllocs = 0;
@@ -1013,6 +1025,7 @@ namespace {
           HasFoldFailureDiagnostic(false), EvalMode(Mode) {}
 
     ~EvalInfo() {
+      CheckUnhandledExceptions();
       discardCleanups();
     }
 
@@ -1023,6 +1036,42 @@ namespace {
       EvaluatingDecl = Base;
       IsEvaluatingDecl = EDK;
       EvaluatingDeclValue = &Value;
+    }
+    
+    bool CheckUnhandledExceptions() {
+      if (!this->ExceptionUnrolling.empty()) {
+        std::cout << "CheckUnhandledExceptions: " << this->ExceptionUnrolling.size() << " exception(s)\n";
+        auto & TopException = this->ExceptionUnrolling.top();
+        
+        auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.valueFromThrow, *this);
+        
+        
+        
+        if (Description) {
+          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << *Description;
+        } else {
+          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.valueFromThrow->getAsString(Ctx, TopException.type);
+        }
+        
+        
+        this->ExceptionUnrolling.pop();
+      
+        while (!this->ExceptionUnrolling.empty()) {
+          auto & TopException = this->ExceptionUnrolling.top();
+          
+          auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.valueFromThrow, *this);
+        
+          if (Description) {
+            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type <<*Description;
+          } else {
+            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.valueFromThrow->getAsString(Ctx, TopException.type);
+          }
+          
+          this->ExceptionUnrolling.pop();
+        }
+        return false;
+      }
+      return true;
     }
 
     bool CheckCallLimit(SourceLocation Loc) {
@@ -1898,6 +1947,8 @@ static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
 
 static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string>;
 
+static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception);
+
 //===----------------------------------------------------------------------===//
 // Misc utilities
 //===----------------------------------------------------------------------===//
@@ -2031,12 +2082,12 @@ void CallStackFrame::describe(raw_ostream &Out) const {
 /// Evaluate an expression to see if it had side-effects, and discard its
 /// result.
 /// \return \c true if the caller should keep evaluating.
-static bool EvaluateIgnoredValue(EvalInfo &Info, const Expr *E) {
+[[nodiscard]] static bool EvaluateIgnoredValue(EvalInfo &Info, const Expr *E) {
   assert(!E->isValueDependent());
   APValue Scratch;
   if (!Evaluate(Scratch, Info, E))
     // We don't need the value, but we might have skipped a side effect here.
-    return Info.noteSideEffect();
+    return Info.ExceptionUnrolling.empty() && Info.noteSideEffect();
   return true;
 }
 
@@ -4951,6 +5002,17 @@ enum EvalStmtResult {
   /// Still scanning for 'case' or 'default' statement.
   ESR_CaseNotFound
 };
+
+const char * result_to_string(EvalStmtResult val) {
+  switch (val) {
+    case EvalStmtResult::ESR_Failed: return "ESR_Failed";
+    case EvalStmtResult::ESR_Returned: return "ESR_Returned";
+    case EvalStmtResult::ESR_Succeeded: return "ESR_Succeeded";
+    case EvalStmtResult::ESR_Continue: return "ESR_Continue";
+    case EvalStmtResult::ESR_Break: return "ESR_Break";
+    case EvalStmtResult::ESR_CaseNotFound: return "ESR_CaseNotFound";
+  }
+}
 }
 
 static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
@@ -5631,8 +5693,82 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   case Stmt::DefaultStmtClass:
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
   case Stmt::CXXTryStmtClass:
-    // Evaluate try blocks by evaluating all sub statements.
-    return EvaluateStmt(Result, Info, cast<CXXTryStmt>(S)->getTryBlock(), Case);
+    {
+      std::cout << "<try>";
+      const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
+      // Evaluate try blocks by evaluating all sub statements.
+      //__builtin_debugtrap();
+      const auto result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
+      //tryStatement->getTryBlock()->dump();
+      std::cout << "result = " << result_to_string(result) << "\n";
+      
+      if (result == ESR_Failed && !Info.ExceptionUnrolling.empty()) {
+        std::cout << "trying to handle...\n";
+        auto & TopException = Info.ExceptionUnrolling.top();
+        
+        const QualType ExceptionType = TopException.type;
+        //std::cout << "\nCatching exception...\n";
+        for (const Stmt * catchHandler: tryStatement->handlers()) {
+          //std::cout << " * ";
+          const CXXCatchStmt * Catch = cast<CXXCatchStmt>(catchHandler);
+        
+          // handle catch(...) right now
+          if (!Catch->getExceptionDecl()) {
+            std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
+            Info.ExceptionUnrolling.pop(); // TODO ability to rethrow
+            // TODO deallocate object!
+            std::cout << "[exception pop]\n";
+            std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
+            //std::cout << "catch(...)\n";
+            auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
+            std::cout << "</try>";
+            return result;
+          }
+          
+          std::cout << "non-generic handler...\n";
+        
+          const auto * CaughtType = Catch->getCaughtType()->getUnqualifiedDesugaredType();
+          if (CaughtType->isReferenceType()) {
+             CaughtType = CaughtType->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
+          }
+        
+          // skip incompatible handles...
+          if (!IsCompatibleCatchHandler(CaughtType, ExceptionType)) {
+            std::cout << "[skipping]\n";
+            continue;
+          }
+        
+        
+          std::cout << "[compatible handler]";
+          Info.ExceptionUnrolling.pop();
+          std::cout << "[exception pop]\n";
+          
+          //std::cout << Catch->getCaughtType().getAsString() << " vs exc = " << ExceptionType.getAsString() << "\n";
+        
+          // create scope for variable to store/bind the exception
+          //FullExpressionRAII Scope(Info);
+        
+          //// FIXME: do it properly
+          //const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
+          //assert(exceptionVariableDecl->isExceptionVariable());
+          //
+          //AssignExceptionToCatchHandler(Result.ExceptionType, Result.Exception, exceptionVariableDecl, Info, nullptr);
+          //
+          //// and evaluate the handler
+          auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
+          std::cout << "</try>";
+          return result;
+        }
+        // TODO rethrow 
+        //std::cout << " (not caught)\n";
+        std::cout << "</try>\nfailed to handle...\n";
+        return ESR_Failed;
+      }
+      
+      std::cout << "</try non failed>\n";
+      return result;
+    }
+    
   }
 }
 
@@ -6028,6 +6164,9 @@ static bool HandleDynamicCast(EvalInfo &Info, const ExplicitCastExpr *E,
         << DiagKind << Ptr.Designator.getType(Info.Ctx)
         << Info.Ctx.getRecordType(DynType->Type)
         << E->getType().getUnqualifiedType();
+    
+    // TODO throw exception std::bad_cast here when we know how!
+    
     return false;
   };
 
@@ -7802,6 +7941,31 @@ public:
   }
   bool VisitBuiltinBitCastExpr(const BuiltinBitCastExpr *E) {
     return static_cast<Derived*>(this)->VisitCastExpr(E);
+  }
+  bool VisitCXXThrowExpr(const CXXThrowExpr *E) {
+    //__builtin_debugtrap();
+    if (!Info.Ctx.getLangOpts().CPlusPlus26) {
+      CCEDiag(E, diag::note_constexpr_throwing_not_allowed_prior_cpp26);
+      return false;
+    }
+    
+    const Expr *ThrowExpr = E->getSubExpr();
+    
+    if (ThrowExpr) {
+      LValue LV;
+      APValue *Val = Info.createHeapAlloc(E, ThrowExpr->getType(), LV);
+      if (!Evaluate(*Val, Info, ThrowExpr)) {
+        return false;
+      }
+      Info.ExceptionUnrolling.emplace(EvalInfo::UnrollingExceptionT{E, Val, ThrowExpr->getType()});
+      std::cout << "[exception push]\n";
+      return false;
+    } else if (!Info.ExceptionUnrolling.empty()) {
+      return false;
+    } else {
+      CCEDiag(E, diag::note_constexpr_rethrowing_no_exception);
+      return false;
+    }
   }
 
   bool VisitBinaryOperator(const BinaryOperator *E) {
@@ -15644,6 +15808,8 @@ public:
     {
       auto result = ConvertPointerToString(E->getArg(0), Info);
       if (result) {
+        std::cout << "constexpr error: " << *result << "\n";
+      
         Info.FFDiag(E, diag::custom_constexpr_error) << *result;
       }
       return false;
@@ -17193,4 +17359,79 @@ static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & In
     if (!HandleLValueArrayAdjustment(Info, PointerExpression, String, CharTy, 1))
       return std::nullopt;
   }
+}
+
+static bool isUnambiguousPublicBaseClass(const Type *DerivedType,
+                                  const Type *BaseType) {
+  const auto *DerivedClass =
+      DerivedType->getCanonicalTypeUnqualified()->getAsCXXRecordDecl();
+  const auto *BaseClass =
+      BaseType->getCanonicalTypeUnqualified()->getAsCXXRecordDecl();
+  if (!DerivedClass || !BaseClass)
+    return false;
+
+  CXXBasePaths Paths;
+  Paths.setOrigin(DerivedClass);
+
+  bool IsPublicBaseClass = false;
+  DerivedClass->lookupInBases(
+      [&BaseClass, &IsPublicBaseClass](const CXXBaseSpecifier *BS,
+                                       CXXBasePath &) {
+        if (BS->getType()
+                    ->getCanonicalTypeUnqualified()
+                    ->getAsCXXRecordDecl() == BaseClass &&
+            BS->getAccessSpecifier() == AS_public) {
+          IsPublicBaseClass = true;
+          return true;
+        }
+
+        return false;
+      },
+      Paths);
+
+  return !Paths.isAmbiguous(BaseType->getCanonicalTypeUnqualified()) &&
+         IsPublicBaseClass;
+}
+
+static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception)
+{
+  const Type * ExceptionTy = Exception.getTypePtrOrNull();
+  
+  assert(HandlerTy != nullptr);
+  assert(ExceptionTy != nullptr);
+  
+  const CanQualType HandlerCanTy = HandlerTy->getCanonicalTypeUnqualified();
+  const CanQualType ExceptionCanTy = ExceptionTy->getCanonicalTypeUnqualified();
+  
+  // The handler is of type cv T or cv T& and E and T are the same type
+  // (ignoring the top-level cv-qualifiers) ...
+  if (ExceptionCanTy == HandlerCanTy) {
+    //std::cout << "E == T (ignoring top level cv-qualifier)\n";
+    return true;
+  }
+  
+  // The handler is of type cv T or cv T& and T is an unambiguous public base
+  // class of E ...
+  if (isUnambiguousPublicBaseClass(ExceptionCanTy->getTypePtr(), HandlerCanTy->getTypePtr())) {
+    //std::cout << "isUnambiguousPublicBaseClass\n";
+    return true;
+  }
+  
+  if (HandlerCanTy->getTypeClass() == Type::RValueReference || (HandlerCanTy->getTypeClass() == Type::LValueReference && !HandlerCanTy->getTypePtr()->getPointeeType().isConstQualified())) {
+    //std::cout << "[R-value reference or non-const L-value reference]";
+    return false;
+  }
+  
+  // TODO implement remainder
+  
+  
+  //std::cout << "[" << QualType(HandlerTy,0).getAsString() << " vs " << QualType(ExceptionTy,0).getAsString() << "]";
+  return false;
+}
+
+namespace {
+static auto ObtainStringContentFromWhatMember(const CXXThrowExpr * ThrowExpression, APValue & value, EvalInfo & Info) -> std::optional<std::string> {
+  
+  return std::nullopt;
+}
 }

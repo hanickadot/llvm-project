@@ -393,6 +393,12 @@ def note_constexpr_delete_base_nonvirt_dtor : Note<
 def note_constexpr_memory_leak : Note<
   "allocation performed here was not deallocated"
   "%plural{0:|: (along with %0 other memory leak%s0)}0">;
+def note_constexpr_unhandled_exception_with_content : Error<
+  "unhandled exception of type %0 with content: %1">;
+def note_constexpr_rethrowing_no_exception : Note<
+  "there is no exception to rethrow">;
+def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
+  "throwing exception is not allowed prior C++26">;
 def note_constexpr_unsupported_layout : Note<
   "type %0 has unexpected layout">;
 def note_constexpr_unsupported_flexible_array : Note<
@@ -403,6 +409,8 @@ def note_constexpr_assumption_failed : Note<
   "assumption evaluated to false">;
 def err_experimental_clang_interp_failed : Error<
   "the experimental clang interpreter failed to evaluate an expression">;
+def custom_constexpr_error : Error<
+  "custom constexpr error: '%0'">;
 
 def warn_integer_constant_overflow : Warning<
   "overflow in expression; result is %0 with type %1">,
