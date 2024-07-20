@@ -61,4 +61,7 @@ static_assert(r2 == 3 * via_modifying_child);
 constexpr auto r4 = test([] { throw new special_child{17}; });
 static_assert(r4 == 17 * via_special_child_catch); 
 
+// CHECK-NOT: error
+// CHECK-NOT: warning
+// CHECK-NOT: note
 

@@ -483,7 +483,15 @@ static bool isQualificationConvertiblePointer(QualType From, QualType To,
 }
 
 bool CXXThrowExpr::isCompatibleHandler(const Type * HandlerTy, const LangOptions & LangOpts) const {
-  CanQualType ExceptionCanTy = this->getType()->getCanonicalTypeUnqualified();
+  assert(HandlerTy != nullptr);
+  assert(getSubExpr());
+  
+  // TODO: check me why
+  if (HandlerTy->isReferenceType()) {
+     HandlerTy = HandlerTy->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
+  }
+  
+  CanQualType ExceptionCanTy = getSubExpr()->getType()->getCanonicalTypeUnqualified();
   CanQualType HandlerCanTy = HandlerTy->getCanonicalTypeUnqualified();
 
   // The handler is of type cv T or cv T& and E and T are the same type
@@ -536,6 +544,18 @@ bool CXXThrowExpr::isCompatibleHandler(const Type * HandlerTy, const LangOptions
   
   return false;
 }
+
+bool CXXThrowExpr::isCompatibleHandler(const CXXCatchStmt * Handler, const LangOptions & LangOpts) const {
+  assert(getSubExpr());
+  
+  // catch `...` universal handler
+  if (!Handler->getExceptionDecl()) {
+    return true;
+  }
+  
+  return isCompatibleHandler(Handler->getCaughtType()->getUnqualifiedDesugaredType(), LangOpts);
+}
+
 
 QualType CXXUuidofExpr::getTypeOperand(ASTContext &Context) const {
   assert(isTypeOperand() && "Cannot call getTypeOperand for __uuidof(expr)");
