@@ -1239,6 +1239,7 @@ public:
   
   /// Determine if QualType of Exception handler is compatible with current exception type
   bool isCompatibleHandler(const Type * HandlerTy, const LangOptions & LangOpts) const;
+  bool isCompatibleHandler(const CXXCatchStmt * Handler, const LangOptions & LangOpts) const;
   
   SourceLocation getBeginLoc() const { return getThrowLoc(); }
   SourceLocation getEndLoc() const LLVM_READONLY {
