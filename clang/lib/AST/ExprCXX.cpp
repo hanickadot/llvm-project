@@ -302,12 +302,13 @@ static bool isStandardPointerConvertible(QualType From, QualType To) {
   // (3)
   // A prvalue of type “pointer to cv D”, where D is a complete class type, can
   // be converted to a prvalue of type “pointer to cv B”, where B is a base
-  // class of D. If B is an inaccessible or ambiguous base class of D, a program
-  // that necessitates this conversion is ill-formed.
+  // class of D.
   if (const auto *RD = From->getPointeeCXXRecordDecl()) {
     if (RD->isCompleteDefinition() &&
         isBaseOf(From->getPointeeType().getTypePtr(),
                  To->getPointeeType().getTypePtr())) {
+      // If B is an inaccessible or ambiguous base class of D, a program
+      // that necessitates this conversion is ill-formed
       return isUnambiguousPublicBaseClass(
                        From->getPointeeType().getTypePtr(),
                        To->getPointeeType().getTypePtr());
