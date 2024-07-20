@@ -393,7 +393,7 @@ def note_constexpr_delete_base_nonvirt_dtor : Note<
 def note_constexpr_memory_leak : Note<
   "allocation performed here was not deallocated"
   "%plural{0:|: (along with %0 other memory leak%s0)}0">;
-def note_constexpr_unhandled_exception_with_content : Error<
+def note_constexpr_unhandled_exception_with_content : Note<
   "unhandled exception of type %0 with content: %1">;
 def note_constexpr_rethrowing_no_exception : Note<
   "there is no exception to rethrow">;
