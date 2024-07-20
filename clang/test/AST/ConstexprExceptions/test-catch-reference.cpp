@@ -32,33 +32,29 @@ consteval int test(void (*fnc)()) {
   int result = 0;
   try {
     fnc();
-  } catch (special_child * sch) {
-    result = sch->get_value() * via_special_child_catch;
-    delete sch;
-  } catch (const special_child * sch) {
-    result = sch->get_value() * via_special_child_catch * via_const_catch;
-    delete sch;
-  } catch (parent * exc) {
-    result = exc->get_value();
-    delete exc;
-  } catch (const parent * exc) {
-    result = exc->get_value() * via_const_catch;
-    delete exc;
+  } catch (special_child & sch) {
+    result = sch.get_value() * via_special_child_catch;
+  } catch (const special_child & sch) {
+    result = sch.get_value() * via_special_child_catch * via_const_catch;
+  } catch (parent & exc) {
+    result = exc.get_value();
+  } catch (const parent & exc) {
+    result = exc.get_value() * via_const_catch;
   }
   return result;
 }
 
-constexpr auto r1 = test([] { throw new parent{1}; });
+constexpr auto r1 = test([] { throw parent{1}; });
 static_assert(r1 == 1);
 
-constexpr auto r2 = test([] { throw new modifying_child{3}; });
+constexpr auto r2 = test([] { throw modifying_child{3}; });
 static_assert(r2 == 3 * via_childs_get_value);
 
 // FIXME: same conversion as with reference!
-//constexpr auto r3 = test([] { throw new ordinary_child{5}; });
+//constexpr auto r3 = test([] { throw ordinary_child{5}; });
 //static_assert(r3 == 5);
 
-constexpr auto r4 = test([] { throw new special_child{17}; });
+constexpr auto r4 = test([] { throw special_child{17}; });
 static_assert(r4 == 17 * via_special_child_catch); 
 
 // CHECK-NOT: error

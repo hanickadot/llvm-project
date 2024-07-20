@@ -308,7 +308,9 @@ static bool isStandardPointerConvertible(QualType From, QualType To) {
     if (RD->isCompleteDefinition() &&
         isBaseOf(From->getPointeeType().getTypePtr(),
                  To->getPointeeType().getTypePtr())) {
-      return true;
+      return isUnambiguousPublicBaseClass(
+                       From->getPointeeType().getTypePtr(),
+                       To->getPointeeType().getTypePtr());
     }
   }
 
@@ -486,7 +488,6 @@ bool CXXThrowExpr::isCompatibleHandler(const Type * HandlerTy, const LangOptions
   assert(HandlerTy != nullptr);
   assert(getSubExpr());
   
-  // TODO: check me why
   if (HandlerTy->isReferenceType()) {
      HandlerTy = HandlerTy->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
   }
@@ -518,10 +519,7 @@ bool CXXThrowExpr::isCompatibleHandler(const Type * HandlerTy, const LangOptions
       isPointerOrPointerToMember(ExceptionCanTy->getTypePtr())) {
     // A standard pointer conversion not involving conversions to pointers to
     // private or protected or ambiguous classes ...
-    if (isStandardPointerConvertible(ExceptionCanTy, HandlerCanTy) &&
-        isUnambiguousPublicBaseClass(
-            ExceptionCanTy->getTypePtr()->getPointeeType().getTypePtr(),
-            HandlerCanTy->getTypePtr()->getPointeeType().getTypePtr())) {
+    if (isStandardPointerConvertible(ExceptionCanTy, HandlerCanTy)) {
       return true;
     }
     // A function pointer conversion ...

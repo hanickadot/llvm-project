@@ -5791,10 +5791,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           //      return false;
           //  return true;
           //}
-          
-          std::cout << "\n\n\nhandler vs exception:\n";
-          Catch->getExceptionDecl()->getType()->dump();
-          TopException.type->dump();
+        
           //std::cout << "[END]\n";
         
           //std::cout << "non-generic handler...\n";
@@ -5809,8 +5806,8 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
           
           QualType T = exceptionVariableDecl->getType();
-          std::cout << "\n\n\nHandler type:\n";
-          T.dump();
+          //std::cout << "\n\n\nHandler type:\n";
+          //T.dump();
           //Val = ExceptionValue;
   
           if (T->isReferenceType()) {
