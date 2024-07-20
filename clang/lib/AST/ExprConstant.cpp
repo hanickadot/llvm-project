@@ -1959,7 +1959,7 @@ static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
 
 static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string>;
 
-static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception);
+static bool IsCompatibleCatchHandler(const Type *HandlerTy, const Type *ExceptionTy, EvalInfo & Info);
 
 static std::optional<DynAlloc *> CheckDeleteKind(EvalInfo &Info, const Expr *E,
                                                  const LValue &Pointer,
@@ -3786,10 +3786,15 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     if ((O->isAbsent() && !(handler.AccessKind == AK_Construct && I == N)) ||
         (O->isIndeterminate() &&
          !isValidIndeterminateAccess(handler.AccessKind))) {
-      if (!Info.checkingPotentialConstantExpression())
+      if (!Info.checkingPotentialConstantExpression()) {
+        std::cout << "NOOOOOOOO!\n";
+        std::cout << (O->isAbsent() ? "isAbsent" : "") << "\n";
+        std::cout << (O->isIndeterminate() ? "isIndeterminate" : "") << "\n";
         Info.FFDiag(E, diag::note_constexpr_access_uninit)
             << handler.AccessKind << O->isIndeterminate()
             << E->getSourceRange();
+      }
+      
       return handler.failed();
     }
 
@@ -5789,10 +5794,12 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
              CaughtType = CaughtType->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
           }
           
-          //if (TryBingExceptionToHandler())
-        
           // skip incompatible handles...
-          if (!IsCompatibleCatchHandler(CaughtType, ExceptionType)) {
+          //if (!TopException.expression->isCompatibleHandler(CaughtType, Info.getLangOpts())) {
+          //  continue;
+          //}
+          
+          if (!IsCompatibleCatchHandler(CaughtType, ExceptionType.getTypePtrOrNull(), Info)) {
             //std::cout << "[skipping]\n";
             continue;
           }
@@ -5813,7 +5820,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           //  return true;
           //}
           
-          //std::cout << "\nhandler vs exception:\n";
+          std::cout << "\n\n\nhandler vs exception:\n";
           Catch->getExceptionDecl()->getType()->dump();
           TopException.type->dump();
           //std::cout << "[END]\n";
@@ -5830,12 +5837,11 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
           
           QualType T = exceptionVariableDecl->getType();
+          std::cout << "\n\n\nHandler type:\n";
           T.dump();
           //Val = ExceptionValue;
   
-          if (T->isPointerType()) {
-            std::cout << "Pointer type\n";
-          } else if (T->isReferenceType()) {
+          if (T->isReferenceType()) {
             Val = TopException.pointer;
             std::cout << "REference type\n";
           } else {
@@ -17526,39 +17532,288 @@ static bool isUnambiguousPublicBaseClass(const Type *DerivedType,
          IsPublicBaseClass;
 }
 
-static bool IsCompatibleCatchHandler(const Type * HandlerTy, const QualType Exception)
-{
-  const Type * ExceptionTy = Exception.getTypePtrOrNull();
-  
-  assert(HandlerTy != nullptr);
-  assert(ExceptionTy != nullptr);
-  
-  const CanQualType HandlerCanTy = HandlerTy->getCanonicalTypeUnqualified();
-  const CanQualType ExceptionCanTy = ExceptionTy->getCanonicalTypeUnqualified();
-  
+static bool isPointerOrPointerToMember(const Type *T) {
+  return T->isPointerType() || T->isMemberPointerType();
+}
+
+
+static bool isFunctionPointerConvertible(QualType From, QualType To) {
+  if (!From->isFunctionPointerType() && !From->isFunctionType() &&
+      !From->isMemberFunctionPointerType())
+    return false;
+
+  if (!To->isFunctionPointerType() && !To->isMemberFunctionPointerType())
+    return false;
+
+  if (To->isFunctionPointerType()) {
+    if (From->isFunctionPointerType())
+      return To->getPointeeType() == From->getPointeeType();
+
+    if (From->isFunctionType())
+      return To->getPointeeType() == From;
+
+    return false;
+  }
+
+  if (To->isMemberFunctionPointerType()) {
+    if (!From->isMemberFunctionPointerType())
+      return false;
+
+    const auto *FromMember = cast<MemberPointerType>(From);
+    const auto *ToMember = cast<MemberPointerType>(To);
+
+    // Note: converting Derived::* to Base::* is a different kind of conversion,
+    // called Pointer-to-member conversion.
+    return FromMember->getClass() == ToMember->getClass() &&
+           FromMember->getPointeeType() == ToMember->getPointeeType();
+  }
+
+  return false;
+}
+
+static bool isBaseOf(const Type *DerivedType, const Type *BaseType) {
+  const auto *DerivedClass = DerivedType->getAsCXXRecordDecl();
+  const auto *BaseClass = BaseType->getAsCXXRecordDecl();
+  if (!DerivedClass || !BaseClass)
+    return false;
+
+  return !DerivedClass->forallBases(
+      [BaseClass](const CXXRecordDecl *Cur) { return Cur != BaseClass; });
+}
+
+// Check if T1 is more or Equally qualified than T2.
+static bool moreOrEquallyQualified(QualType T1, QualType T2) {
+  return T1.getQualifiers().isStrictSupersetOf(T2.getQualifiers()) ||
+         T1.getQualifiers() == T2.getQualifiers();
+}
+
+static bool isStandardPointerConvertible(QualType From, QualType To) {
+  assert((From->isPointerType() || From->isMemberPointerType()) &&
+         (To->isPointerType() || To->isMemberPointerType()) &&
+         "Pointer conversion should be performed on pointer types only.");
+
+  if (!moreOrEquallyQualified(To->getPointeeType(), From->getPointeeType()))
+    return false;
+
+  // (1)
+  // A null pointer constant can be converted to a pointer type ...
+  // The conversion of a null pointer constant to a pointer to cv-qualified type
+  // is a single conversion, and not the sequence of a pointer conversion
+  // followed by a qualification conversion. A null pointer constant of integral
+  // type can be converted to a prvalue of type std::nullptr_t
+  if (To->isPointerType() && From->isNullPtrType())
+    return true;
+
+  // (2)
+  // A prvalue of type “pointer to cv T”, where T is an object type, can be
+  // converted to a prvalue of type “pointer to cv void”.
+  if (To->isVoidPointerType() && From->isObjectPointerType())
+    return true;
+
+  // (3)
+  // A prvalue of type “pointer to cv D”, where D is a complete class type, can
+  // be converted to a prvalue of type “pointer to cv B”, where B is a base
+  // class of D. If B is an inaccessible or ambiguous base class of D, a program
+  // that necessitates this conversion is ill-formed.
+  if (const auto *RD = From->getPointeeCXXRecordDecl()) {
+    if (RD->isCompleteDefinition() &&
+        isBaseOf(From->getPointeeType().getTypePtr(),
+                 To->getPointeeType().getTypePtr())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static std::optional<QualType> getPointeeOrArrayElementQualType(QualType T) {
+  if (T->isAnyPointerType() || T->isMemberPointerType())
+    return T->getPointeeType();
+
+  if (T->isArrayType())
+    return T->getAsArrayTypeUnsafe()->getElementType();
+
+  return std::nullopt;
+}
+
+static bool isQualificationConvertiblePointer(QualType From, QualType To,
+                                       LangOptions LangOpts) {
+
+  // [N4659 7.5 (1)]
+  // A cv-decomposition of a type T is a sequence of cv_i and P_i such that T is
+  //    cv_0 P_0 cv_1 P_1 ... cv_n−1 P_n−1 cv_n U” for n > 0,
+  // where each cv_i is a set of cv-qualifiers, and each P_i is “pointer to”,
+  // “pointer to member of class C_i of type”, “array of N_i”, or
+  // “array of unknown bound of”.
+  //
+  // If P_i designates an array, the cv-qualifiers cv_i+1 on the element type
+  // are also taken as the cv-qualifiers cvi of the array.
+  //
+  // The n-tuple of cv-qualifiers after the first one in the longest
+  // cv-decomposition of T, that is, cv_1, cv_2, ... , cv_n, is called the
+  // cv-qualification signature of T.
+
+  auto isValidP_i = [](QualType P) {
+    return P->isPointerType() || P->isMemberPointerType() ||
+           P->isConstantArrayType() || P->isIncompleteArrayType();
+  };
+
+  auto isSameP_i = [](QualType P1, QualType P2) {
+    if (P1->isPointerType())
+      return P2->isPointerType();
+
+    if (P1->isMemberPointerType())
+      return P2->isMemberPointerType() &&
+             P1->getAs<MemberPointerType>()->getClass() ==
+                 P2->getAs<MemberPointerType>()->getClass();
+
+    if (P1->isConstantArrayType())
+      return P2->isConstantArrayType() &&
+             cast<ConstantArrayType>(P1)->getSize() ==
+                 cast<ConstantArrayType>(P2)->getSize();
+
+    if (P1->isIncompleteArrayType())
+      return P2->isIncompleteArrayType();
+
+    return false;
+  };
+
+  // (2)
+  // Two types From and To are similar if they have cv-decompositions with the
+  // same n such that corresponding P_i components are the same [(added by
+  // N4849 7.3.5) or one is “array of N_i” and the other is “array of unknown
+  // bound of”], and the types denoted by U are the same.
+  //
+  // (3)
+  // A prvalue expression of type From can be converted to type To if the
+  // following conditions are satisfied:
+  //  - From and To are similar
+  //  - For every i > 0, if const is in cv_i of From then const is in cv_i of
+  //  To, and similarly for volatile.
+  //  - [(derived from addition by N4849 7.3.5) If P_i of From is “array of
+  //  unknown bound of”, P_i of To is “array of unknown bound of”.]
+  //  - If the cv_i of From and cv_i of To are different, then const is in every
+  //  cv_k of To for 0 < k < i.
+
+  int I = 0;
+  bool ConstUntilI = true;
+  auto SatisfiesCVRules = [&I, &ConstUntilI](const QualType &From,
+                                             const QualType &To) {
+    if (I > 1) {
+      if (From.getQualifiers() != To.getQualifiers() && !ConstUntilI)
+        return false;
+    }
+
+    if (I > 0) {
+      if (From.isConstQualified() && !To.isConstQualified())
+        return false;
+
+      if (From.isVolatileQualified() && !To.isVolatileQualified())
+        return false;
+
+      ConstUntilI = To.isConstQualified();
+    }
+
+    return true;
+  };
+
+  while (isValidP_i(From) && isValidP_i(To)) {
+    // Remove every sugar.
+    From = From.getCanonicalType();
+    To = To.getCanonicalType();
+
+    if (!SatisfiesCVRules(From, To))
+      return false;
+
+    if (!isSameP_i(From, To)) {
+      if (LangOpts.CPlusPlus20) {
+        if (From->isConstantArrayType() && !To->isIncompleteArrayType())
+          return false;
+
+        if (From->isIncompleteArrayType() && !To->isIncompleteArrayType())
+          return false;
+
+      } else {
+        return false;
+      }
+    }
+
+    ++I;
+    std::optional<QualType> FromPointeeOrElem =
+        getPointeeOrArrayElementQualType(From);
+    std::optional<QualType> ToPointeeOrElem =
+        getPointeeOrArrayElementQualType(To);
+
+    assert(FromPointeeOrElem &&
+           "From pointer or array has no pointee or element!");
+    assert(ToPointeeOrElem && "To pointer or array has no pointee or element!");
+
+    From = *FromPointeeOrElem;
+    To = *ToPointeeOrElem;
+  }
+
+  // In this case the length (n) of From and To are not the same.
+  if (isValidP_i(From) || isValidP_i(To))
+    return false;
+
+  // We hit U.
+  if (!SatisfiesCVRules(From, To))
+    return false;
+
+  return From.getTypePtr() == To.getTypePtr();
+}
+
+static bool IsCompatibleCatchHandler(const Type *HandlerTy, const Type *ExceptionTy, EvalInfo & Info) {
+  CanQualType ExceptionCanTy = ExceptionTy->getCanonicalTypeUnqualified();
+  CanQualType HandlerCanTy = HandlerTy->getCanonicalTypeUnqualified();
+
   // The handler is of type cv T or cv T& and E and T are the same type
   // (ignoring the top-level cv-qualifiers) ...
   if (ExceptionCanTy == HandlerCanTy) {
-    //std::cout << "E == T (ignoring top level cv-qualifier)\n";
     return true;
   }
-  
+
   // The handler is of type cv T or cv T& and T is an unambiguous public base
   // class of E ...
-  if (isUnambiguousPublicBaseClass(ExceptionCanTy->getTypePtr(), HandlerCanTy->getTypePtr())) {
-    //std::cout << "isUnambiguousPublicBaseClass\n";
+  else if (isUnambiguousPublicBaseClass(ExceptionCanTy->getTypePtr(),
+                                        HandlerCanTy->getTypePtr())) {
     return true;
   }
-  
-  if (HandlerCanTy->getTypeClass() == Type::RValueReference || (HandlerCanTy->getTypeClass() == Type::LValueReference && !HandlerCanTy->getTypePtr()->getPointeeType().isConstQualified())) {
-    //std::cout << "[R-value reference or non-const L-value reference]";
+
+  if (HandlerCanTy->getTypeClass() == Type::RValueReference ||
+      (HandlerCanTy->getTypeClass() == Type::LValueReference &&
+       !HandlerCanTy->getTypePtr()->getPointeeType().isConstQualified()))
     return false;
+  // The handler is of type cv T or const T& where T is a pointer or
+  // pointer-to-member type and E is a pointer or pointer-to-member type that
+  // can be converted to T by one or more of ...
+  if (isPointerOrPointerToMember(HandlerCanTy->getTypePtr()) &&
+      isPointerOrPointerToMember(ExceptionCanTy->getTypePtr())) {
+    // A standard pointer conversion not involving conversions to pointers to
+    // private or protected or ambiguous classes ...
+    if (isStandardPointerConvertible(ExceptionCanTy, HandlerCanTy) &&
+        isUnambiguousPublicBaseClass(
+            ExceptionCanTy->getTypePtr()->getPointeeType().getTypePtr(),
+            HandlerCanTy->getTypePtr()->getPointeeType().getTypePtr())) {
+      return true;
+    }
+    // A function pointer conversion ...
+    else if (isFunctionPointerConvertible(ExceptionCanTy, HandlerCanTy)) {
+      return true;
+    }
+    // A a qualification conversion ...
+    else if (isQualificationConvertiblePointer(ExceptionCanTy, HandlerCanTy,
+                                               Info.Ctx.getLangOpts())) {
+      return true;
+    }
   }
-  
-  // TODO implement remainder
-  
-  
-  //std::cout << "[" << QualType(HandlerTy,0).getAsString() << " vs " << QualType(ExceptionTy,0).getAsString() << "]";
+
+  // The handler is of type cv T or const T& where T is a pointer or
+  // pointer-to-member type and E is std::nullptr_t.
+  else if (isPointerOrPointerToMember(HandlerCanTy->getTypePtr()) &&
+           ExceptionCanTy->isNullPtrType()) {
+    return true;
+  }
   return false;
 }
 
