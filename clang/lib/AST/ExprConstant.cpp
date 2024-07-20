@@ -1041,9 +1041,13 @@ namespace {
       EvaluatingDeclValue = &Value;
     }
     
+    bool CurrentlyUnrollingException() const {
+      return !this->ExceptionUnrolling.empty();
+    }
+    
     bool CheckUnhandledExceptions() {
-      if (!this->ExceptionUnrolling.empty()) {
-        std::cout << "CheckUnhandledExceptions: " << this->ExceptionUnrolling.size() << " exception(s)\n";
+      if (CurrentlyUnrollingException()) {
+        //std::cout << "CheckUnhandledExceptions: " << this->ExceptionUnrolling.size() << " exception(s)\n";
         auto & TopException = this->ExceptionUnrolling.top();
         
         auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
@@ -1279,8 +1283,13 @@ namespace {
     /// Note that we have had a side-effect, and determine whether we should
     /// keep evaluating.
     bool noteSideEffect() {
-      EvalStatus.HasSideEffects = true;
-      return keepEvaluatingAfterSideEffect();
+      if (CurrentlyUnrollingException()) {
+        // we are avoiding marking side-effects as this will disable deallocations
+        return false;
+      } else {
+        EvalStatus.HasSideEffects = true;
+        return keepEvaluatingAfterSideEffect();
+      }
     }
 
     /// Should we continue evaluation after encountering undefined behavior?
@@ -1466,7 +1475,7 @@ namespace {
     }
     ~ScopeRAII() {
       if (OldStackSize != -1U)
-        destroy(false);
+        destroy(Info.CurrentlyUnrollingException());
       // Body moved to a static method to encourage the compiler to inline away
       // instances of this class.
       Info.CurrentCall->popTempVersion();
@@ -2094,7 +2103,8 @@ static bool EvaluateIgnoredValue(EvalInfo &Info, const Expr *E) {
   APValue Scratch;
   if (!Evaluate(Scratch, Info, E))
     // We don't need the value, but we might have skipped a side effect here.
-    return Info.ExceptionUnrolling.empty() && Info.noteSideEffect();
+    return Info.noteSideEffect();
+    
   return true;
 }
 
@@ -5713,11 +5723,21 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     return EvaluateStmt(Result, Info, cast<SwitchCase>(S)->getSubStmt(), Case);
   case Stmt::CXXTryStmtClass:
     {
-      //std::cout << "<try>";
+      //std::cout << " <try>\n";
       const CXXTryStmt * tryStatement = cast<CXXTryStmt>(S);
       // Evaluate try blocks by evaluating all sub statements.
       //__builtin_debugtrap();
+      BlockScopeRAII TryScope(Info);
       const auto result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
+      
+      if (!TryScope.destroy()) {
+        Info.ExceptionUnrolling.pop();
+        //std::cout << " </try scope-failed-to-destroy>\n";
+        return ESR_Failed;
+      }
+      
+      //std::cout << " </try>\n";
+      
       //tryStatement->getTryBlock()->dump();
       //std::cout << "result = " << result_to_string(result) << "\n";
       
@@ -5758,16 +5778,21 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         
           // handle catch(...) right now
           if (!Catch->getExceptionDecl()) {
+            //std::cout << "  <catch...>\n";
             //std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
-            
+            BlockScopeRAII CatchScope(Info);
             // TODO deallocate object!
             //std::cout << "catch(...)\n";
-            auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
+            auto EvalResult = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
             deallocate_exception();
             Info.ExceptionUnrolling.pop(); // TODO ability to rethrow
-            
-            //std::cout << "</try>";
-            return result;
+            if (!CatchScope.destroy()) {
+              //std::cout << "  </catch... scope failed to destroy>\n";
+              return ESR_Failed;
+            }
+            //std::cout << "</try result=" << result_to_string(result) <<">\n";
+            //std::cout << "  </catch...>\n";
+            return EvalResult;
           }
           
           
@@ -5775,30 +5800,83 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           if (CaughtType->isReferenceType()) {
              CaughtType = CaughtType->castAs<ReferenceType>()->getPointeeType()->getUnqualifiedDesugaredType();
           }
+          
+          //if (TryBingExceptionToHandler())
         
           // skip incompatible handles...
           if (!IsCompatibleCatchHandler(CaughtType, ExceptionType)) {
             //std::cout << "[skipping]\n";
             continue;
           }
+          
+          //std::cout << "  <catch>\n";
+          
+          //static bool CastToBaseClass(EvalInfo &Info, const Expr *E, LValue &Result,
+          //                            const CXXRecordDecl *DerivedRD,
+          //                            const CXXRecordDecl *BaseRD) {
+          //  CXXBasePaths Paths(/*FindAmbiguities=*/false,
+          //                     /*RecordPaths=*/true, /*DetectVirtual=*/false);
+          //  if (!DerivedRD->isDerivedFrom(BaseRD, Paths))
+          //    llvm_unreachable("Class must be derived from the passed in base class!");
+          //
+          //  for (CXXBasePathElement &Elem : Paths.front())
+          //    if (!HandleLValueBase(Info, E, Result, Elem.Class, Elem.Base))
+          //      return false;
+          //  return true;
+          //}
+          
+          //std::cout << "\nhandler vs exception:\n";
+          Catch->getExceptionDecl()->getType()->dump();
+          TopException.type->dump();
+          //std::cout << "[END]\n";
         
           //std::cout << "non-generic handler...\n";
           
-          auto result = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
+          const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
+          assert(exceptionVariableDecl->isExceptionVariable());
+        
+          FullExpressionRAII CatchScope(Info);
+          
+          // create variable to access the exception object
+          LValue ResultLValue;
+          APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
+          
+          QualType T = exceptionVariableDecl->getType();
+          T.dump();
+          //Val = ExceptionValue;
+  
+          if (T->isPointerType()) {
+            std::cout << "Pointer type\n";
+          } else if (T->isReferenceType()) {
+            Val = TopException.pointer;
+            std::cout << "REference type\n";
+          } else {
+            Val = *TopException.value;
+          }
+          
+          
+          auto EvalResult = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
           deallocate_exception();
           
           Info.ExceptionUnrolling.pop();
           
-          //std::cout << "</try>";
-          return result;
+          if (!CatchScope.destroy()) {
+            //std::cout << "  </catch scope failed to destroy>\n";
+          
+            return ESR_Failed;
+          }
+          
+          //std::cout << "</try result=" << result_to_string(result) <<">\n";
+          //std::cout << "  </catch>\n";
+          return EvalResult;
         }
         // TODO rethrow 
         //std::cout << " (not caught)\n";
         //std::cout << "</try>\nfailed to handle...\n";
+        //std::cout << "  [no handler]\n";
         return ESR_Failed;
       }
-      
-      //std::cout << "</try non failed>\n";
+      //std::cout << "  [try without exception]\n";
       return result;
     }
     
@@ -7996,6 +8074,7 @@ public:
 
       APValue ptr;
       Result.moveInto(ptr);
+      //std::cout << "  (( THROWING EXCEPTION ))\n";
       Info.ExceptionUnrolling.emplace(EvalInfo::UnrollingExceptionT{E, Val, ptr, ThrowExpr->getType()});
       
       return false;
@@ -10278,26 +10357,21 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
   }
 
   if (ValueInit) {
-    std::cout << "[valueinit]\n";
     ImplicitValueInitExpr VIE(AllocType);
     if (!EvaluateInPlace(*Val, Info, Result, &VIE))
       return false;
   } else if (ResizedArrayILE) {
-    std::cout << "[ResizedArrayILE]\n";
     if (!EvaluateArrayNewInitList(Info, Result, *Val, ResizedArrayILE,
                                   AllocType))
       return false;
   } else if (ResizedArrayCCE) {
-    std::cout << "[ResizedArrayCCE]\n";
     if (!EvaluateArrayNewConstructExpr(Info, Result, *Val, ResizedArrayCCE,
                                        AllocType))
       return false;
   } else if (Init) {
-    std::cout << "[ResizedArrayCCE]\n"; 
     if (!EvaluateInPlace(*Val, Info, Result, Init))
       return false;
   } else {
-    std::cout << "[defaultinit]\n"; 
     if (!handleDefaultInitValue(AllocType, *Val)) {
       return false;
     }
@@ -15876,7 +15950,7 @@ public:
     {
       auto result = ConvertPointerToString(E->getArg(0), Info);
       if (result) {
-        std::cout << "constexpr print: '" << *result << "'\n";
+        std::cout << "constexpr print: \033[1;97m'" << *result << "'\033[0m\n";
       }
       return result.has_value();
     }
