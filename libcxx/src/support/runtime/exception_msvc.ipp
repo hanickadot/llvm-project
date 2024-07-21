@@ -59,9 +59,7 @@ _LIBCPP_NORETURN void terminate() noexcept {
 #endif // _LIBCPP_HAS_NO_EXCEPTIONS
 }
 
-bool uncaught_exception() noexcept { return uncaught_exceptions() > 0; }
-
-int uncaught_exceptions() noexcept { return __uncaught_exceptions(); }
+int __runtime_uncaught_exceptions() noexcept { return __uncaught_exceptions(); }
 
 #if !defined(_LIBCPP_ABI_VCRUNTIME)
 bad_cast::bad_cast() noexcept {}

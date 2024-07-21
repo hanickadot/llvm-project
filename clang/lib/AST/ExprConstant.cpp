@@ -15865,7 +15865,9 @@ public:
 
     case Builtin::BI__builtin_debugtrap:
     case Builtin::BI__constexpr_breakpoint:
+#if __has_builtin(__builtin_debugtrap)
       __builtin_debugtrap();
+#endif
       return true;
     
     case Builtin::BI__constexpr_print:
