@@ -4786,3 +4786,46 @@ def ConstexprError: Builtin {
   let Attributes = [NoThrow, Constexpr];
   let Prototype = "void(char const*)";
 }
+
+def ConstexprAssert: Builtin {
+  let Spellings = ["constexpr_assert"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(bool, char const*)";
+}
+
+// Support for manipulating std::exception_ptr's inner value during constant evaluation
+def ConstexprCurrentException: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_current_exception"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void*()";
+}
+
+def ConstexprActiveExceptions: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_active_exceptions"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "int()";
+}
+
+def ConstexprUncaughtExceptions: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_uncaught_exceptions"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "int()";
+}
+
+def ConstexprRethrowException: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_rethrow_exception"];
+  let Attributes = [Constexpr];
+  let Prototype = "void(void *)";
+}
+
+def ConstexprExceptionRefcountInc: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_exception_refcount_inc"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(void *)";
+}
+
+def ConstexprExceptionRefcountDec: LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__constexpr_exception_refcount_dec"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(void *)";
+}

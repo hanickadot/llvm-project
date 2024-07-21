@@ -897,8 +897,9 @@ namespace {
       QualType type;
     };
     
-    std::stack<UnrollingExceptionT> ExceptionUnrolling;
-
+    std::stack<UnrollingExceptionT> UncaughtExceptions;
+    std::stack<UnrollingExceptionT> ActiveExceptions;
+    
     /// The number of heap allocations performed so far in this evaluation.
     unsigned NumHeapAllocs = 0;
 
@@ -1042,13 +1043,13 @@ namespace {
     }
     
     bool CurrentlyUnrollingException() const {
-      return !this->ExceptionUnrolling.empty();
+      return !this->UncaughtExceptions.empty();
     }
     
     bool CheckUnhandledExceptions() {
       if (CurrentlyUnrollingException()) {
-        //std::cout << "CheckUnhandledExceptions: " << this->ExceptionUnrolling.size() << " exception(s)\n";
-        auto & TopException = this->ExceptionUnrolling.top();
+        //std::cout << "CheckUnhandledExceptions: " << this->UncaughtExceptions.size() << " exception(s)\n";
+        auto & TopException = this->UncaughtExceptions.top();
         
         auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
         
@@ -1061,10 +1062,10 @@ namespace {
         }
         
         
-        this->ExceptionUnrolling.pop();
+        this->UncaughtExceptions.pop();
       
-        while (!this->ExceptionUnrolling.empty()) {
-          auto & TopException = this->ExceptionUnrolling.top();
+        while (!this->UncaughtExceptions.empty()) {
+          auto & TopException = this->UncaughtExceptions.top();
           
           auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
         
@@ -1074,7 +1075,7 @@ namespace {
             this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.value->getAsString(Ctx, TopException.type);
           }
           
-          this->ExceptionUnrolling.pop();
+          this->UncaughtExceptions.pop();
         }
         return false;
       }
@@ -3785,9 +3786,6 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
         (O->isIndeterminate() &&
          !isValidIndeterminateAccess(handler.AccessKind))) {
       if (!Info.checkingPotentialConstantExpression()) {
-        std::cout << "NOOOOOOOO!\n";
-        std::cout << (O->isAbsent() ? "isAbsent" : "") << "\n";
-        std::cout << (O->isIndeterminate() ? "isIndeterminate" : "") << "\n";
         Info.FFDiag(E, diag::note_constexpr_access_uninit)
             << handler.AccessKind << O->isIndeterminate()
             << E->getSourceRange();
@@ -5711,138 +5709,93 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       const auto result = EvaluateStmt(Result, Info, tryStatement->getTryBlock(), Case);
       
       if (!TryScope.destroy()) {
-        Info.ExceptionUnrolling.pop();
+        Info.UncaughtExceptions.pop();
         //std::cout << " </try scope-failed-to-destroy>\n";
         return ESR_Failed;
       }
       
-      //std::cout << " </try>\n";
-      
-      //tryStatement->getTryBlock()->dump();
-      //std::cout << "result = " << result_to_string(result) << "\n";
-      
-      if (result == ESR_Failed && !Info.ExceptionUnrolling.empty()) {
-        //std::cout << "trying to handle...\n";
-        auto & TopException = Info.ExceptionUnrolling.top();
-        
-        auto deallocate_exception = [&]{
-          //std::cout << "\n\n------\n\n";
-          LValue LV;
-          LV.setFrom(Info.Ctx, TopException.pointer);
-          
-          std::optional<DynAlloc *> Alloc = CheckDeleteKind(Info, TopException.expression, LV, DynAlloc::New);
-          if (!Alloc) {
-            //std::cout << "failed to CheckDeleteKind\n";
-            return false;
-          }
-            
-          QualType AllocType = LV.Base.getDynamicAllocType();
-          
-          //std::cout << "AllocType: " << AllocType.getAsString() << "\n";
-          
-          if (!HandleDestruction(Info, S->getBeginLoc(), LV.getLValueBase(), (*Alloc)->Value, AllocType)) {
-            //std::cout << "failed to destruct exception!\n";
-            return false;
-          }
-          
-          Info.HeapAllocs.erase(LV.Base.get<DynamicAllocLValue>());
-          
-          return true;
-        };
+      if (result == ESR_Failed && !Info.UncaughtExceptions.empty()) {
+        //std::cout << "trying to handle...\n"; 
+        // FIXME make the exception active
+        Info.ActiveExceptions.emplace(std::move(Info.UncaughtExceptions.top()));
+        Info.UncaughtExceptions.pop();
+        auto & TopException = Info.ActiveExceptions.top();
         
         for (const Stmt * catchHandler: tryStatement->handlers()) {
           //std::cout << " * ";
           const CXXCatchStmt * Catch = cast<CXXCatchStmt>(catchHandler);
         
-          // handle catch(...) right now
-          if (!Catch->getExceptionDecl()) {
-            //std::cout << "  <catch...>\n";
-            //std::cout << "generic handler... (size = " << Info.ExceptionUnrolling.size() << ")\n";
-            BlockScopeRAII CatchScope(Info);
-            // TODO deallocate object!
-            //std::cout << "catch(...)\n";
-            auto EvalResult = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
-            deallocate_exception();
-            Info.ExceptionUnrolling.pop(); // TODO ability to rethrow
-            if (!CatchScope.destroy()) {
-              //std::cout << "  </catch... scope failed to destroy>\n";
-              return ESR_Failed;
-            }
-            //std::cout << "</try result=" << result_to_string(result) <<">\n";
-            //std::cout << "  </catch...>\n";
-            return EvalResult;
-          }
-          
           // skip incompatible handles...
           if (!TopException.expression->isCompatibleHandler(Catch, Info.getLangOpts())) {
             continue;
           }
           
-          //static bool CastToBaseClass(EvalInfo &Info, const Expr *E, LValue &Result,
-          //                            const CXXRecordDecl *DerivedRD,
-          //                            const CXXRecordDecl *BaseRD) {
-          //  CXXBasePaths Paths(/*FindAmbiguities=*/false,
-          //                     /*RecordPaths=*/true, /*DetectVirtual=*/false);
-          //  if (!DerivedRD->isDerivedFrom(BaseRD, Paths))
-          //    llvm_unreachable("Class must be derived from the passed in base class!");
-          //
-          //  for (CXXBasePathElement &Elem : Paths.front())
-          //    if (!HandleLValueBase(Info, E, Result, Elem.Class, Elem.Base))
-          //      return false;
-          //  return true;
-          //}
-        
-          //std::cout << "[END]\n";
-        
-          //std::cout << "non-generic handler...\n";
-          
-          const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl();
-          assert(exceptionVariableDecl->isExceptionVariable());
-        
           FullExpressionRAII CatchScope(Info);
+        
+          // handle with variable to initialize
+          if (const VarDecl * exceptionVariableDecl = Catch->getExceptionDecl()) {
+            assert(exceptionVariableDecl->isExceptionVariable());
           
-          // create variable to access the exception object
-          LValue ResultLValue;
-          APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
+            // create variable to access the exception object
+            LValue ResultLValue;
+            APValue &Val = Info.CurrentCall->createTemporary(exceptionVariableDecl, exceptionVariableDecl->getType(), ScopeKind::Block, ResultLValue);
           
-          QualType T = exceptionVariableDecl->getType();
-          //std::cout << "\n\n\nHandler type:\n";
-          //T.dump();
-          //Val = ExceptionValue;
-  
-          if (T->isReferenceType()) {
-            Val = TopException.pointer;
-            std::cout << "REference type\n";
-          } else {
-            Val = *TopException.value;
+            QualType T = exceptionVariableDecl->getType();
+
+            // TODO handle conversions
+            if (T->isReferenceType()) {
+              Val = TopException.pointer;
+            } else {
+              Val = *TopException.value;
+            }
+          
           }
           
           
           auto EvalResult = EvaluateStmt(Result, Info, Catch->getHandlerBlock(), Case);
-          deallocate_exception();
           
-          Info.ExceptionUnrolling.pop();
+          if (EvalResult != ESR_Failed) {
+            // deallocate the exception object
+            // FIXME don't deallocate in rethrowing
+            LValue LV;
+            LV.setFrom(Info.Ctx, TopException.pointer);
           
+            std::optional<DynAlloc *> Alloc = CheckDeleteKind(Info, TopException.expression, LV, DynAlloc::New);
+            if (!Alloc) {
+              //std::cout << "failed to CheckDeleteKind\n";
+              // TODO stop exceptions
+              return ESR_Failed;
+            }
+            
+            QualType AllocType = LV.Base.getDynamicAllocType();
+          
+            //std::cout << "AllocType: " << AllocType.getAsString() << "\n";
+          
+            if (!HandleDestruction(Info, S->getBeginLoc(), LV.getLValueBase(), (*Alloc)->Value, AllocType)) {
+              //std::cout << "failed to destruct exception!\n";
+              // TODO stop exceptions
+              return ESR_Failed;
+            }
+          
+            Info.HeapAllocs.erase(LV.Base.get<DynamicAllocLValue>());
+          }
+          
+          // destroy scope
           if (!CatchScope.destroy()) {
-            //std::cout << "  </catch scope failed to destroy>\n";
-          
             return ESR_Failed;
           }
           
-          //std::cout << "</try result=" << result_to_string(result) <<">\n";
-          //std::cout << "  </catch>\n";
+          Info.ActiveExceptions.pop();
           return EvalResult;
         }
-        // TODO rethrow 
-        //std::cout << " (not caught)\n";
-        //std::cout << "</try>\nfailed to handle...\n";
-        //std::cout << "  [no handler]\n";
+        
+        // rethrow exception further
+        Info.UncaughtExceptions.emplace(std::move(Info.ActiveExceptions.top()));
+        Info.ActiveExceptions.pop();
         return ESR_Failed;
       }
-      //std::cout << "  [try without exception]\n";
       return result;
     }
-    
   }
 }
 
@@ -8019,7 +7972,6 @@ public:
     return static_cast<Derived*>(this)->VisitCastExpr(E);
   }
   bool VisitCXXThrowExpr(const CXXThrowExpr *E) {
-    //__builtin_debugtrap();
     if (!Info.Ctx.getLangOpts().CPlusPlus26) {
       CCEDiag(E, diag::note_constexpr_throwing_not_allowed_prior_cpp26);
       return false;
@@ -8037,15 +7989,15 @@ public:
 
       APValue ptr;
       Result.moveInto(ptr);
-      //std::cout << "  (( THROWING EXCEPTION ))\n";
-      Info.ExceptionUnrolling.emplace(EvalInfo::UnrollingExceptionT{E, Val, ptr, ThrowExpr->getType()});
+      Info.UncaughtExceptions.emplace(EvalInfo::UnrollingExceptionT{E, Val, ptr, ThrowExpr->getType()});
       
       return false;
-    } else if (!Info.ExceptionUnrolling.empty()) {
-      // TODO rethrow
+    } else if (!Info.ActiveExceptions.empty()) {
+      Info.UncaughtExceptions.emplace(Info.ActiveExceptions.top());
+      // don't pop active exception, it will be pop when we leave catch handler
       return false;
     } else {
-      CCEDiag(E, diag::note_constexpr_rethrowing_no_exception);
+      CCEDiag(E, diag::note_constexpr_no_active_exception);
       return false;
     }
   }
@@ -10123,6 +10075,13 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
           !HandleLValueArrayAdjustment(Info, E, Dest, T, Direction))
         return false;
     }
+  }
+  
+  case Builtin::BI__constexpr_current_exception: {
+    // TODO implement
+    const int count = static_cast<int64_t>(Info.ActiveExceptions.size());
+    std::cout << "__constexpr_current_exception() -> (active = " << count << ")\n";
+    return ZeroInitialization(E);
   }
 
   default:
@@ -13405,6 +13364,12 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       return false;
     return Success(DidOverflow, E);
   }
+  case Builtin::BI__constexpr_active_exceptions:
+    //std::cout << "__constexpr_active_exceptions() -> " << Info.ActiveExceptions.size() << "\n";
+    return Success(static_cast<int64_t>(Info.ActiveExceptions.size()), E);
+  case Builtin::BI__constexpr_uncaught_exceptions:
+    //std::cout << "__constexpr_uncaught_exceptions() -> " << Info.UncaughtExceptions.size() << "\n";
+    return Success(static_cast<int64_t>(Info.UncaughtExceptions.size()), E);
   }
 }
 
@@ -15906,6 +15871,33 @@ public:
       }
       return false;
     }
+    
+    case Builtin::BIconstexpr_assert:
+    {
+      APSInt Result;
+      if (!EvaluateInteger(E->getArg(0), Result, Info)) {
+        return false;
+      }
+      if (Result == 0) {
+        auto description = ConvertPointerToString(E->getArg(1), Info);
+        Info.FFDiag(E, diag::err_constexpr_assertion_failure) << *description;
+        return false;
+      }
+      return true;
+    }
+    
+    case Builtin::BI__constexpr_rethrow_exception:
+      // TODO implement
+      std::cout << "__constexpr_rethrow_exception()\n";
+      return true;
+    case Builtin::BI__constexpr_exception_refcount_inc:
+      // TODO implement
+      std::cout << "__constexpr_exception_refcount_inc()\n";
+      return true;
+    case Builtin::BI__constexpr_exception_refcount_dec:
+      // TODO implement
+      std::cout << "__constexpr_exception_refcount_dec()\n";
+      return true;
 
     default:
       return false;
