@@ -395,10 +395,12 @@ def note_constexpr_memory_leak : Note<
   "%plural{0:|: (along with %0 other memory leak%s0)}0">;
 def note_constexpr_unhandled_exception_with_content : Note<
   "unhandled exception of type %0 with content: %1">;
-def note_constexpr_rethrowing_no_exception : Note<
-  "there is no exception to rethrow">;
+def note_constexpr_no_active_exception : Note<
+  "there is no active exception to rethrow">;
 def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
   "throwing exception is not allowed prior C++26">;
+def err_constexpr_assertion_failure : Error<
+  "constexpr assertion failure: '%0'">;
 def note_constexpr_unsupported_layout : Note<
   "type %0 has unexpected layout">;
 def note_constexpr_unsupported_flexible_array : Note<
