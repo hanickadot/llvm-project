@@ -13,19 +13,19 @@
 
 namespace std {
 
-exception_ptr::~exception_ptr() noexcept { __cxa_decrement_exception_refcount(__ptr_); }
+void exception_ptr::__destroy() noexcept { __cxa_decrement_exception_refcount(__ptr_); }
 
-exception_ptr::exception_ptr(const exception_ptr& other) noexcept : __ptr_(other.__ptr_) {
+void exception_ptr::__copy_from(const exception_ptr& other) noexcept {
+  __ptr_ = other.__ptr_;
   __cxa_increment_exception_refcount(__ptr_);
 }
 
-exception_ptr& exception_ptr::operator=(const exception_ptr& other) noexcept {
+void exception_ptr::__assign_from(const exception_ptr& other) noexcept {
   if (__ptr_ != other.__ptr_) {
     __cxa_increment_exception_refcount(other.__ptr_);
     __cxa_decrement_exception_refcount(__ptr_);
     __ptr_ = other.__ptr_;
   }
-  return *this;
 }
 
 exception_ptr exception_ptr::__from_native_exception_pointer(void* __e) noexcept {
@@ -46,7 +46,7 @@ _LIBCPP_NORETURN void nested_exception::rethrow_nested() const {
   rethrow_exception(__ptr_);
 }
 
-exception_ptr current_exception() noexcept {
+exception_ptr exception_ptr::__current_exception() noexcept {
   // be nicer if there was a constructor that took a ptr, then
   // this whole function would be just:
   //    return exception_ptr(__cxa_current_primary_exception());
@@ -55,7 +55,7 @@ exception_ptr current_exception() noexcept {
   return ptr;
 }
 
-_LIBCPP_NORETURN void rethrow_exception(exception_ptr p) {
+_LIBCPP_NORETURN void exception_ptr::__rethrow_exception(const exception_ptr & p) {
   __cxa_rethrow_primary_exception(p.__ptr_);
   // if p.__ptr_ is NULL, above returns so we terminate
   terminate();
