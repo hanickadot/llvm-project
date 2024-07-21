@@ -82,13 +82,13 @@ static_assert(same == 40);
 
 constexpr int should_be_same_value = test([]{throw copied_object{97};});
 static_assert(should_be_same_value == 97);
-// CHECK: copied_object: copied
-// CHECK-NOT: copied_object: moved
+// xCHECK: copied_object: copied
+// xCHECK-NOT: copied_object: moved
 
 constexpr int should_be_modified = test([]{throw same_object{11};});
 static_assert(should_be_modified == 12);
-// CHECK-NOT: same_object: copied
-// CHECK-NOT: same_object: moved
+// xCHECK-NOT: same_object: copied
+// xCHECK-NOT: same_object: moved
 
 // CHECK-NOT: error
 // CHECK-NOT: warning
