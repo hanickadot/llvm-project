@@ -50,9 +50,7 @@ _LIBCPP_NORETURN void terminate() noexcept {
 #endif // _LIBCPP_HAS_NO_EXCEPTIONS
 }
 
-bool uncaught_exception() noexcept { return uncaught_exceptions() > 0; }
-
-int uncaught_exceptions() noexcept {
+int __runtime_uncaught_exceptions() noexcept {
 #warning uncaught_exception not yet implemented
   fprintf(stderr, "uncaught_exceptions not yet implemented\n");
   ::abort();

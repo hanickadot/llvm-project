@@ -29,13 +29,24 @@ using terminate_handler = void (*)();
 _LIBCPP_EXPORTED_FROM_ABI terminate_handler set_terminate(terminate_handler) _NOEXCEPT;
 _LIBCPP_EXPORTED_FROM_ABI terminate_handler get_terminate() _NOEXCEPT;
 
-_LIBCPP_EXPORTED_FROM_ABI bool uncaught_exception() _NOEXCEPT;
-_LIBCPP_EXPORTED_FROM_ABI int uncaught_exceptions() _NOEXCEPT;
+_LIBCPP_EXPORTED_FROM_ABI int __runtime_uncaught_exceptions() _NOEXCEPT;
+
+_LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 int uncaught_exceptions() _NOEXCEPT {
+  if (__builtin_is_constant_evaluated()) {
+    return __constexpr_uncaught_exceptions();
+  } else {
+    return __runtime_uncaught_exceptions();
+  }
+}
+
+_LIBCPP_EXPORTED_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX20 bool uncaught_exception() _NOEXCEPT {
+  return uncaught_exceptions() > 0;
+}
 
 class _LIBCPP_EXPORTED_FROM_ABI exception_ptr;
 
-_LIBCPP_EXPORTED_FROM_ABI exception_ptr current_exception() _NOEXCEPT;
-_LIBCPP_NORETURN _LIBCPP_EXPORTED_FROM_ABI void rethrow_exception(exception_ptr);
+_LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 exception_ptr current_exception() _NOEXCEPT;
+_LIBCPP_NORETURN _LIBCPP_ALWAYS_INLINE _LIBCPP_CONSTEXPR_SINCE_CXX20 void rethrow_exception(exception_ptr);
 } // namespace std
 
 #endif // _LIBCPP___EXCEPTION_OPERATIONS_H

@@ -12,19 +12,20 @@
 
 namespace std {
 
-exception_ptr::~exception_ptr() noexcept {
+void exception_ptr::__destroy() noexcept {
 #warning exception_ptr not yet implemented
   fprintf(stderr, "exception_ptr not yet implemented\n");
   ::abort();
 }
 
-exception_ptr::exception_ptr(const exception_ptr& other) noexcept : __ptr_(other.__ptr_) {
+void exception_ptr::__copy_from(const exception_ptr& other) noexcept {
+  __ptr_ = other.__ptr_;
 #warning exception_ptr not yet implemented
   fprintf(stderr, "exception_ptr not yet implemented\n");
   ::abort();
 }
 
-exception_ptr& exception_ptr::operator=(const exception_ptr& other) noexcept {
+void exception_ptr::__assign_from(const exception_ptr& other) noexcept {
 #warning exception_ptr not yet implemented
   fprintf(stderr, "exception_ptr not yet implemented\n");
   ::abort();
@@ -55,13 +56,13 @@ _LIBCPP_NORETURN void nested_exception::rethrow_nested() const {
 #endif // FIXME
 }
 
-exception_ptr current_exception() noexcept {
+exception_ptr nested_exception::__current_exception() noexcept {
 #warning exception_ptr not yet implemented
   fprintf(stderr, "exception_ptr not yet implemented\n");
   ::abort();
 }
 
-_LIBCPP_NORETURN void rethrow_exception(exception_ptr p) {
+_LIBCPP_NORETURN void nested_exception::__rethrow_exception(exception_ptr p) {
 #warning exception_ptr not yet implemented
   fprintf(stderr, "exception_ptr not yet implemented\n");
   ::abort();
