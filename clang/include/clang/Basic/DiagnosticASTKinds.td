@@ -394,7 +394,11 @@ def note_constexpr_memory_leak : Note<
   "allocation performed here was not deallocated"
   "%plural{0:|: (along with %0 other memory leak%s0)}0">;
 def note_constexpr_unhandled_exception_with_content : Note<
-  "unhandled exception of type %0 with content: %1">;
+  "unhandled exception of type %0 with content %1 thrown from here">;
+def note_constexpr_unhandled_exception_with_message : Note<
+  "unhandled exception: %1">;
+def note_constexpr_unhandled_exception : Note<
+  "unhandled exception of type %0 thrown from here">;
 def note_constexpr_no_active_exception : Note<
   "there is no active exception to rethrow">;
 def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
