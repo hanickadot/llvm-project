@@ -84,7 +84,8 @@ namespace {
   using SourceLocExprScopeGuard =
       CurrentSourceLocExprScope::SourceLocExprScopeGuard;
 
-  static auto ObtainStringContentFromWhatMember(const CXXThrowExpr * ThrowExpression, APValue & value, EvalInfo & Info) -> std::optional<std::string>;
+  static auto TryAccessWhat(const CXXThrowExpr * expr, APValue ThisVal, EvalInfo & Info) -> std::optional<std::string>;
+  static void DiagnoseUnhandledException(const CXXThrowExpr * expr, const APValue & ThisVal, const APValue & Content, EvalInfo & Info);
 
   static QualType getType(APValue::LValueBase B) {
     return B.getType();
@@ -1049,31 +1050,10 @@ namespace {
     bool CheckUnhandledExceptions() {
       if (CurrentlyUnrollingException()) {
         //std::cout << "CheckUnhandledExceptions: " << this->UncaughtExceptions.size() << " exception(s)\n";
-        auto & TopException = this->UncaughtExceptions.top();
-        
-        auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
-        
-        
-        
-        if (Description) {
-          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << *Description;
-        } else {
-          this->CCEDiag(TopException.expression->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.value->getAsString(Ctx, TopException.type);
-        }
-        
-        
-        this->UncaughtExceptions.pop();
-      
         while (!this->UncaughtExceptions.empty()) {
           auto & TopException = this->UncaughtExceptions.top();
           
-          auto Description = ObtainStringContentFromWhatMember(TopException.expression, *TopException.value, *this);
-        
-          if (Description) {
-            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type <<*Description;
-          } else {
-            this->Note(TopException.expression->getSubExpr()->getExprLoc(), diag::note_constexpr_unhandled_exception_with_content) << TopException.type << TopException.value->getAsString(Ctx, TopException.type);
-          }
+          DiagnoseUnhandledException(TopException.expression, TopException.pointer, *TopException.value, *this);
           
           this->UncaughtExceptions.pop();
         }
@@ -7995,9 +7975,11 @@ public:
       LValue Result;
       APValue * Val = Info.createHeapAlloc(E, ThrowExpr->getType(), Result);
 
-      if (!EvaluateInPlace(*Val, Info, Result, ThrowExpr)) {
+      if (!Val)
         return false;
-      }
+
+      if (!EvaluateInPlace(*Val, Info, Result, ThrowExpr))
+        return false;
 
       APValue ptr;
       Result.moveInto(ptr);
@@ -10090,10 +10072,10 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   }
   
   case Builtin::BI__constexpr_current_exception: {
-    // TODO implement
-    const int count = static_cast<int64_t>(Info.ActiveExceptions.size());
-    std::cout << "__constexpr_current_exception() -> (active = " << count << ")\n";
-    return ZeroInitialization(E);
+    if (Info.ActiveExceptions.empty()) {
+      return ZeroInitialization(E);
+    }
+    return Success(Info.ActiveExceptions.top().pointer, E);
   }
 
   default:
@@ -17482,8 +17464,122 @@ static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & In
 }
 
 namespace {
-static auto ObtainStringContentFromWhatMember(const CXXThrowExpr * ThrowExpression, APValue & value, EvalInfo & Info) -> std::optional<std::string> {
+static void DiagnoseUnhandledException(const CXXThrowExpr * E, const APValue & ThisVal, const APValue & Content, EvalInfo & Info) {
+  // TODO: attach diagnostics to exception, so in case it's not caught we can show original diagnostic
+  // (allocation failure, bad type id ...)
+  
+  // if there `.what() const` member returning `const char *`
+  if (auto Message = TryAccessWhat(E, ThisVal, Info)) {
+    Info.CCEDiag(E->getSubExpr(), diag::note_constexpr_unhandled_exception_with_message) << E->getSubExpr()->getType() << *Message;
+  } else if (Info.Ctx.getTypeSizeInChars(E->getSubExpr()->getType()).isOne()) {
+    // FIXME: it should be empty types, but now it is sizeof(T) == 1
+    Info.CCEDiag(E->getSubExpr(), diag::note_constexpr_unhandled_exception) << E->getSubExpr()->getType();
+  } else {
+    // otherwise print at least content
+    Info.CCEDiag(E->getSubExpr(), diag::note_constexpr_unhandled_exception_with_content) << E->getSubExpr()->getType() << Content.getAsString(Info.Ctx, E->getSubExpr()->getType());
+  }
+}
+  
+static auto TryAccessWhat(const CXXThrowExpr * expr, APValue Object, EvalInfo & Info) -> std::optional<std::string> {
+  struct ResultOfCall {
+    APValue value;
+    APValue pointer;
+    QualType type;
+  };
+  
+  auto findMethodOnTypeAndCallWithThis = [&](QualType type, std::string_view name, APValue ThisVal) -> std::optional<ResultOfCall> {
+    LValue This;
+    This.setFrom(Info.Ctx, ThisVal);
+    
+    auto * decl = type->getAsCXXRecordDecl();
+    if (!decl) {
+      return std::nullopt;
+    }
+    
+    for (CXXMethodDecl * method: decl->methods()) {
+      if (!method->isConst() || !method->isConstexpr()) {
+        continue;
+      }
+      
+      if (!method->getBody()) {
+        continue;
+      }
+      
+      if (name != method->getDeclName().getAsString()) {
+        continue;
+      }
+      
+      auto result = ResultOfCall{};
+      result.type = method->getReturnType();
+      
+      auto Call = Info.CurrentCall->createCall(method);
+    
+      if (!method->getBody()) {
+        continue;
+      }
+      
+      if (!HandleFunctionCall(expr->getThrowLoc(), method, &This, expr, {}, Call, method->getBody(), Info, result.value, nullptr)) {
+        continue;
+      }
+      
+      return result;
+    }
+    
+    return std::nullopt;
+  };
+  
+  auto convertStringToCompilerString = [&](QualType PointerType, APValue Pointer, QualType LengthType = {}, APValue Length = {}) -> std::optional<std::string> {
+    if (!PointerType->isPointerType() || !PointerType->getPointeeType()->isCharType()) {
+      return std::nullopt;
+    }
+    
+    QualType CharTy = PointerType->getPointeeType();
+    LValue PointerLV;
+    PointerLV.setFrom(Info.Ctx, Pointer);
+    
+    std::string ResultString;
+    
+    while (true) {
+      APValue Char;
+      if (!handleLValueToRValueConversion(Info, expr, CharTy, PointerLV, Char)) {
+        return std::nullopt;
+      }
+      
+      APSInt C = Char.getInt();
+
+      if (C == 0) {
+        return ResultString;
+      }
+
+      ResultString.push_back(static_cast<char>(C.getExtValue()));
+      if (!HandleLValueArrayAdjustment(Info, expr, PointerLV, CharTy, 1)) {
+        return std::nullopt;
+      }
+    }
+  };
+
+  auto * subExpr = expr->getSubExpr();
+  
+  if (!subExpr) 
+    return std::nullopt;
+  
+  auto Type = subExpr->getType();
+  
+  BlockScopeRAII TryScope(Info);
+  
+  auto Return = findMethodOnTypeAndCallWithThis(Type, "what", Object);
+  
+  if (!Return)
+    return std::nullopt;
+  
+  // access `const char *`
+  if (Return->type->isPointerType() && Return->type->getPointeeType()->isCharType()) {
+    return convertStringToCompilerString(Return->type, Return->value);
+    
+  }
   
   return std::nullopt;
-}
+}  
+
+
 }
