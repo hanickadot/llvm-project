@@ -106,8 +106,10 @@ namespace StaticOperators {
 
   struct S1 {
     constexpr S1() { // all20-error {{never produces a constant expression}}
-      throw; // all-note {{not valid in a constant expression}} \
-             // all20-note {{not valid in a constant expression}}
+      throw; // ref20-note 2{{throwing exception is not allowed prior C++26}} \
+             // ref23-note {{throwing exception is not allowed prior C++26}} \
+             // expected20-note 2{{not valid in a constant expression}} \
+             // expected23-note {{not valid in a constant expression}}
     }
     static constexpr int operator()() { return 3; } // ref20-warning {{C++23 extension}} \
                                                     // expected20-warning {{C++23 extension}}

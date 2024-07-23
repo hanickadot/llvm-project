@@ -6,7 +6,7 @@ namespace Throw {
   constexpr int ConditionalThrow(bool t) {
     if (t)
       throw 4; // expected-note {{subexpression not valid in a constant expression}} \
-               // ref-note {{subexpression not valid in a constant expression}}
+               // ref-note {{throwing exception is not allowed prior C++26}}
 
     return 0;
   }
@@ -20,13 +20,13 @@ namespace Throw {
   constexpr int Throw() { // expected-error {{never produces a constant expression}} \
                           // ref-error {{never produces a constant expression}}
     throw 5; // expected-note {{subexpression not valid in a constant expression}} \
-             // ref-note {{subexpression not valid in a constant expression}}
+             // ref-note {{throwing exception is not allowed prior C++26}}
     return 0;
   }
 
   constexpr int NoSubExpr() { // ref-error {{never produces a constant expression}} \
                               // expected-error {{never produces a constant expression}}
-    throw; // ref-note 2{{subexpression not valid}} \
+    throw; // ref-note 2{{throwing exception is not allowed prior C++26}} \
            // expected-note 2{{subexpression not valid}}
     return 0;
   }

@@ -330,7 +330,8 @@ namespace InitializerTemporaries {
     constexpr S() {}
     constexpr ~S() noexcept(false) { throw 12; } // both-error {{cannot use 'throw'}} \
                                                  // both-error {{never produces a constant expression}} \
-                                                 // both-note 2{{subexpression not valid}}
+                                                 // expected-note 2{{subexpression not valid}} \
+                                                 // ref-note 2{{throwing exception is not allowed prior C++26}} 
   };
 
   constexpr int f() {
@@ -1444,7 +1445,8 @@ namespace TemporaryWithInvalidDestructor {
   struct A {
     bool a = true;
     constexpr ~A() noexcept(false) { // both-error {{never produces a constant expression}}
-      throw; // both-note 2{{not valid in a constant expression}} \
+      throw; // expected-note 2{{not valid in a constant expression}} \
+             // ref-note 2{{throwing exception is not allowed prior C++26}} \
              // both-error {{cannot use 'throw' with exceptions disabled}}
     }
   };
