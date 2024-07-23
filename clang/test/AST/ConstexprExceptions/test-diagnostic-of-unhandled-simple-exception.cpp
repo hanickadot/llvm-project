@@ -8,4 +8,4 @@ consteval int test() {
 static_assert(test());
 
 // CHECK: error: static assertion expression is not an integral constant expression
-// CHECK: unhandled exception of type 'int' with content: 42
+// CHECK: unhandled exception of type 'int' with content 42 thrown from here

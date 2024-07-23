@@ -738,6 +738,10 @@ namespace {
       *Value.getPointer() = APValue();
       return true;
     }
+    
+    bool isUninitialized() const {
+      return Value.getPointer()->isAbsent();
+    }
 
     bool hasSideEffect() {
       return T.isDestructedType();
@@ -1450,6 +1454,12 @@ namespace {
       Info.CurrentCall->pushTempVersion();
     }
     bool destroy(bool RunDestructors = true) {
+      // Slots for arguments of Calls/initializations must be skipped otherwise 
+      // we would get an error in HandleDestruction
+      if (Info.CurrentlyUnrollingException())
+        cleanupUninitialized(Info, OldStackSize);
+      
+      // Then proceed to destroy all items on stack
       bool OK = cleanup(Info, RunDestructors, OldStackSize);
       OldStackSize = -1U;
       return OK;
@@ -1462,6 +1472,15 @@ namespace {
       Info.CurrentCall->popTempVersion();
     }
   private:
+    static void cleanupUninitialized(EvalInfo &Info, unsigned OldStackSize) {      
+      auto NewEnd = Info.CleanupStack.begin() + OldStackSize;
+      NewEnd =
+          std::remove_if(NewEnd, Info.CleanupStack.end(), [](Cleanup &C) {
+            return C.isDestroyedAtEndOf(Kind) && C.isUninitialized();
+          });
+      Info.CleanupStack.erase(NewEnd, Info.CleanupStack.end());
+    }
+    
     static bool cleanup(EvalInfo &Info, bool RunDestructors,
                         unsigned OldStackSize) {
       assert(OldStackSize <= Info.CleanupStack.size() &&
@@ -5770,6 +5789,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         }
         
         // rethrow exception further
+        // TODO store rethrow location
         Info.UncaughtExceptions.emplace(std::move(Info.ActiveExceptions.top()));
         Info.ActiveExceptions.pop();
         return ESR_Failed;
