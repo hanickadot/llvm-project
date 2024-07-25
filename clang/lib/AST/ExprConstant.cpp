@@ -5031,6 +5031,17 @@ enum EvalStmtResult {
   /// Still scanning for 'case' or 'default' statement.
   ESR_CaseNotFound
 };
+
+const char * EvalStmtToString(EvalStmtResult res) {
+  switch (res) {
+    case ESR_Failed: return "ESR_Failed";
+    case ESR_Returned: return "ESR_Returned";
+    case ESR_Succeeded: return "ESR_Succeeded";
+    case ESR_Continue: return "ESR_Continue";
+    case ESR_Break: return "ESR_Break";
+    case ESR_CaseNotFound: return "ESR_CaseNotFound";
+  }
+}
 }
 
 static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
@@ -5389,9 +5400,32 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       }
       return ESR_Succeeded;
     }
-
     Info.FFDiag(S->getBeginLoc()) << S->getSourceRange();
     return ESR_Failed;
+
+  case Stmt::CoroutineBodyStmtClass: {
+    // TODO do the dance around around coroutine frame and allocation
+    const CoroutineBodyStmt * CB = cast<CoroutineBodyStmt>(S);
+    BlockScopeRAII Scope(Info);
+    if (const auto r1 = EvaluateStmt(Result, Info, CB->getPromiseDeclStmt(), Case); r1 != ESR_Succeeded) {
+      return r1;
+    }
+
+    if (const auto r2 = EvaluateStmt(Result, Info, CB->getBody(), Case); r2 != ESR_Succeeded) {
+      return r2;
+    }
+    
+    // TODO currently promise is living in scope of function
+    if (const auto r3 = EvaluateStmt(Result, Info, CB->getReturnStmt(), Case); r3 != ESR_Returned) {
+      return r3;
+    }
+    
+    if (!Scope.destroy()) {
+      return ESR_Failed;
+    }
+    
+    return r3;
+  }
 
   case Stmt::NullStmtClass:
     return ESR_Succeeded;
@@ -5411,7 +5445,22 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     }
     return ESR_Succeeded;
   }
-
+  case Stmt::CoreturnStmtClass: {
+    const Expr *RetExpr = cast<CoreturnStmt>(S)->getPromiseCall();
+    //std::cout << "[CoreturnStmtClass]\n";
+    //S->dump();
+    FullExpressionRAII Scope(Info);
+    if (RetExpr && RetExpr->isValueDependent()) {
+      EvaluateDependentExpr(RetExpr, Info);
+      // We know we returned, but we don't know what the value is.
+      return ESR_Failed;
+    }
+    EvalStmtResult ESR = EvaluateStmt(Result, Info, RetExpr);
+    
+    if (ESR != ESR_Failed && !Scope.destroy())
+      return ESR_Failed;
+    return ESR;
+  }
   case Stmt::ReturnStmtClass: {
     const Expr *RetExpr = cast<ReturnStmt>(S)->getRetValue();
     FullExpressionRAII Scope(Info);
@@ -8015,6 +8064,38 @@ public:
       return false;
     }
   }
+  
+  bool VisitCoroutineSuspendExpr(const CoroutineSuspendExpr * E) {
+    LValue OperandResult;
+    
+    APValue * Value = &Info.CurrentCall->createTemporary(
+        E->getOpaqueValue(), E->getCommonExpr()->getType(),
+        ScopeKind::FullExpression,
+        OperandResult);
+    
+    if (!EvaluateInPlace(*Value, Info, OperandResult, E->getCommonExpr())) {
+      *Value = APValue();
+      return false;
+    }
+    
+    APSInt AwaitReady;
+    if (!EvaluateInteger(E->getReadyExpr(), AwaitReady, Info)) {
+      return false;
+    }
+    
+    if (!AwaitReady) {
+      // TODO: suspend
+      Info.CCEDiag(E->getKeywordLoc(), diag::err_constexpr_coroutine_suspend_unimplemented);
+      return false;
+    }
+    
+    APValue Result;
+    if (!Evaluate(Result, Info, E->getResumeExpr())) {
+      return false;
+    }
+    
+    return DerivedSuccess(Result, E);
+  }
 
   bool VisitBinaryOperator(const BinaryOperator *E) {
     switch (E->getOpcode()) {
@@ -10090,6 +10171,29 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
         return false;
     }
   }
+  
+  case Builtin::BI__builtin_coro_promise:
+    // TODO do it properly :)
+    if (!evaluatePointer(E->getArg(0), Result)) {
+      Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_failure) << "__builtin_coro_promise";
+      return false;
+    }
+    return true;
+  case Builtin::BI__builtin_coro_frame:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_frame";
+    return false;
+  case Builtin::BI__builtin_coro_noop:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_noop";
+    return false;
+  case Builtin::BI__builtin_coro_free:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_free";
+    return false;
+  case Builtin::BI__builtin_coro_id:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_id";
+    return false;
+  case Builtin::BI__builtin_coro_begin:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_begin";
+    return false;
   
   case Builtin::BI__constexpr_current_exception: {
     if (Info.ActiveExceptions.empty()) {
@@ -13400,6 +13504,24 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BI__constexpr_uncaught_exceptions:
     //std::cout << "__constexpr_uncaught_exceptions() -> " << Info.UncaughtExceptions.size() << "\n";
     return Success(static_cast<int64_t>(Info.UncaughtExceptions.size()), E);
+  case Builtin::BI__builtin_coro_done:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_done";
+    return false;
+  case Builtin::BI__builtin_coro_size:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_size";
+    return false;
+  case Builtin::BI__builtin_coro_align:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_align";
+    return false;
+  case Builtin::BI__builtin_coro_alloc:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_alloc";
+    return false;
+  case Builtin::BI__builtin_coro_end:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_end";
+    return false;
+  case Builtin::BI__builtin_coro_suspend:
+    Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_suspend";
+    return false;
   }
 }
 
@@ -15899,6 +16021,16 @@ public:
       return result.has_value();
     }
     
+    case Builtin::BI__constexpr_print_number:
+    {
+      APSInt Result;
+      if (!EvaluateInteger(E->getArg(0), Result, Info)) {
+        return false;
+      }
+      std::cout << "constexpr print number: \033[1;97m" << Result.getExtValue() << "\033[0m\n";
+      return true;
+    }
+    
     case Builtin::BI__constexpr_error:
     {
       auto result = ConvertPointerToString(E->getArg(0), Info);
@@ -15936,6 +16068,13 @@ public:
       // TODO implement
       std::cout << "__constexpr_exception_refcount_dec()\n";
       return true;
+
+    case Builtin::BI__builtin_coro_resume:
+      Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_resume";
+      return false;
+    case Builtin::BI__builtin_coro_destroy:
+      Info.CCEDiag(E, diag::err_constexpr_coroutine_builtin_unimplemented) << "__builtin_coro_destroy";
+      return false;
 
     default:
       return false;

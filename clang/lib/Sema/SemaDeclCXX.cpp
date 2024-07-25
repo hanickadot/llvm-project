@@ -2222,6 +2222,11 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       return false;
     return true;
 
+  case Stmt::CoroutineBodyStmtClass:
+  case Stmt::CoreturnStmtClass:
+    // add proper checks
+    return true;
+
   default:
     if (!isa<Expr>(S))
       break;

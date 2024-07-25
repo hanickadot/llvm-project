@@ -4336,83 +4336,85 @@ def NontemporalLoad : Builtin {
 // Coroutine intrinsics
 def CoroResume : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_resume"];
+  let Attributes = [Constexpr];
   let Prototype = "void(void*)";
 }
 
 def CoroDestroy : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_destroy"];
+  let Attributes = [Constexpr];
   let Prototype = "void(void*)";
 }
 
 def CoroDone : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_done"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "bool(void*)";
 }
 
 def CoroPromise : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_promise"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*(void*, _Constant int, _Constant bool)";
 }
 
 def CoroSize : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_size"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "size_t()";
 }
 
 def CoroAlign : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_align"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "size_t()";
 }
 
 def CoroFrame : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_frame"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*()";
 }
 
 def CoroNoop : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_noop"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*()";
 }
 
 def CoroFree : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_free"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*(void*)";
 }
 
 def CoroId : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_id"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*(_Constant int, void*, void*, void*)";
 }
 
 def CoroAlloc : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_alloc"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "bool()";
 }
 
 def CoroBegin : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_begin"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "void*(void*)";
 }
 
 def CoroEnd : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_end"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "bool(void*, _Constant bool)";
 }
 
 def CoroSuspend : CoroLangBuiltin {
   let Spellings = ["__builtin_coro_suspend"];
-  let Attributes = [NoThrow];
+  let Attributes = [NoThrow, Constexpr];
   let Prototype = "char(_Constant bool)";
 }
 
@@ -4779,6 +4781,12 @@ def ConstexprPrint: Builtin {
   let Spellings = ["__constexpr_print"];
   let Attributes = [NoThrow, Constexpr];
   let Prototype = "void(char const*)";
+}
+
+def ConstexprPrintNumber: Builtin {
+  let Spellings = ["__constexpr_print_number"];
+  let Attributes = [NoThrow, Constexpr];
+  let Prototype = "void(int)";
 }
 
 def ConstexprError: Builtin {
