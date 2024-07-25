@@ -227,13 +227,6 @@ static bool isValidCoroutineContext(Sema &S, SourceLocation Loc,
   // [basic.start.main]p3: "The function main shall not be a coroutine."
   else if (FD->isMain())
     return DiagInvalid(DiagMain);
-
-  // Emit a diagnostics for each of the following conditions which is not met.
-  // [expr.const]p2: "An expression e is a core constant expression unless the
-  // evaluation of e [...] would evaluate one of the following expressions:
-  // [...] an await-expression [...] a yield-expression."
-  if (FD->isConstexpr())
-    DiagInvalid(FD->isConsteval() ? DiagConsteval : DiagConstexpr);
   // [dcl.spec.auto]p15: "A function declared with a return type that uses a
   // placeholder type shall not be a coroutine."
   if (FD->getReturnType()->isUndeducedType())

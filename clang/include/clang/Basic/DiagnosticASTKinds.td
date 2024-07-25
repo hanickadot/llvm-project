@@ -405,6 +405,12 @@ def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
   "throwing exception is not allowed prior C++26">;
 def err_constexpr_assertion_failure : Error<
   "constexpr assertion failure: '%0'">;
+def err_constexpr_coroutine_builtin_failure : Error<
+  "constexpr coroutine builtin %0 failure">;
+def err_constexpr_coroutine_builtin_unimplemented : Error<
+  "unimplemented constexpr coroutine builtin: %0">;
+def err_constexpr_coroutine_suspend_unimplemented : Error<
+  "suspending constexpr coroutines is unimplemented">;
 def note_constexpr_unsupported_layout : Note<
   "type %0 has unexpected layout">;
 def note_constexpr_unsupported_flexible_array : Note<
