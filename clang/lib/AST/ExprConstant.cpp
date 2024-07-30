@@ -5424,7 +5424,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       return ESR_Failed;
     }
     
-    return r3;
+    return ESR_Returned;
   }
 
   case Stmt::NullStmtClass:
