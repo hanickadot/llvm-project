@@ -26,11 +26,24 @@ namespace __math {
 
 // ceil
 
-_LIBCPP_NODISCARD inline _LIBCPP_HIDE_FROM_ABI float ceil(float __x) _NOEXCEPT { return __builtin_ceilf(__x); }
+_LIBCPP_NODISCARD constexpr inline _LIBCPP_HIDE_FROM_ABI float ceil(float __x) _NOEXCEPT { 
+  if (__libcpp_is_constant_evaluated()) {
+    // ugly hack, best way would be to make __builtin_ceilf work in constexpr
+    return static_cast<float>(static_cast<long long>(__x + 1.0f));
+  } else {
+    return __builtin_ceilf(__x);
+  }
+  
+}
 
 template <class = int>
-_LIBCPP_NODISCARD _LIBCPP_HIDE_FROM_ABI double ceil(double __x) _NOEXCEPT {
-  return __builtin_ceil(__x);
+_LIBCPP_NODISCARD constexpr _LIBCPP_HIDE_FROM_ABI double ceil(double __x) _NOEXCEPT {
+  if (__libcpp_is_constant_evaluated()) {
+    // ugly hack, best way would be to make __builtin_ceil work in constexpr
+    return static_cast<double>(static_cast<long long>(__x + 1.0));
+  } else {
+    return __builtin_ceill(__x);
+  }
 }
 
 _LIBCPP_NODISCARD inline _LIBCPP_HIDE_FROM_ABI long double ceil(long double __x) _NOEXCEPT {
@@ -64,8 +77,7 @@ _LIBCPP_NODISCARD inline _LIBCPP_HIDE_FROM_ABI double floor(_A1 __x) _NOEXCEPT {
 
 inline _LIBCPP_HIDE_FROM_ABI long long llrint(float __x) _NOEXCEPT { return __builtin_llrintf(__x); }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI long long llrint(double __x) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI long long llrint(double __x) _NOEXCEPT {
   return __builtin_llrint(__x);
 }
 
@@ -80,8 +92,7 @@ inline _LIBCPP_HIDE_FROM_ABI long long llrint(_A1 __x) _NOEXCEPT {
 
 inline _LIBCPP_HIDE_FROM_ABI long long llround(float __x) _NOEXCEPT { return __builtin_llroundf(__x); }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI long long llround(double __x) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI long long llround(double __x) _NOEXCEPT {
   return __builtin_llround(__x);
 }
 
@@ -96,8 +107,7 @@ inline _LIBCPP_HIDE_FROM_ABI long long llround(_A1 __x) _NOEXCEPT {
 
 inline _LIBCPP_HIDE_FROM_ABI long lrint(float __x) _NOEXCEPT { return __builtin_lrintf(__x); }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI long lrint(double __x) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI long lrint(double __x) _NOEXCEPT {
   return __builtin_lrint(__x);
 }
 
@@ -112,8 +122,7 @@ inline _LIBCPP_HIDE_FROM_ABI long lrint(_A1 __x) _NOEXCEPT {
 
 inline _LIBCPP_HIDE_FROM_ABI long lround(float __x) _NOEXCEPT { return __builtin_lroundf(__x); }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI long lround(double __x) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI long lround(double __x) _NOEXCEPT {
   return __builtin_lround(__x);
 }
 
@@ -148,8 +157,7 @@ _LIBCPP_NODISCARD inline _LIBCPP_HIDE_FROM_ABI double nearbyint(_A1 __x) _NOEXCE
 
 inline _LIBCPP_HIDE_FROM_ABI float nextafter(float __x, float __y) _NOEXCEPT { return __builtin_nextafterf(__x, __y); }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI double nextafter(double __x, double __y) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI double nextafter(double __x, double __y) _NOEXCEPT {
   return __builtin_nextafter(__x, __y);
 }
 
@@ -170,8 +178,7 @@ inline _LIBCPP_HIDE_FROM_ABI float nexttoward(float __x, long double __y) _NOEXC
   return __builtin_nexttowardf(__x, __y);
 }
 
-template <class = int>
-_LIBCPP_HIDE_FROM_ABI double nexttoward(double __x, long double __y) _NOEXCEPT {
+template <class = int> _LIBCPP_HIDE_FROM_ABI double nexttoward(double __x, long double __y) _NOEXCEPT {
   return __builtin_nexttoward(__x, __y);
 }
 
