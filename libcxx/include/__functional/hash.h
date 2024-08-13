@@ -239,76 +239,125 @@ private:
 template <class _Tp, size_t = sizeof(_Tp) / sizeof(size_t)>
 struct __scalar_hash;
 
+template <size_t _Sz> struct __select_same_sized_uint;
+
+template <> struct __select_same_sized_uint<1> {
+  using __type = uint8_t;
+};
+
+template <> struct __select_same_sized_uint<2> {
+  using __type = uint16_t;
+};
+
+template <> struct __select_same_sized_uint<4> {
+  using __type = uint32_t;
+};
+
+template <> struct __select_same_sized_uint<8> {
+  using __type = uint64_t;
+};
+
 template <class _Tp>
 struct __scalar_hash<_Tp, 0> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    union {
-      _Tp __t;
-      size_t __a;
-    } __u;
-    __u.__a = 0;
-    __u.__t = __v;
-    return __u.__a;
+    if (__libcpp_is_constant_evaluated()) {
+      return __builtin_bit_cast(typename __select_same_sized_uint<sizeof(_Tp)>::__type, __v);
+    } else {
+      union {
+        _Tp __t;
+        size_t __a;
+      } __u;
+      __u.__a = 0;
+      __u.__t = __v;
+      return __u.__a;
+    }
   }
 };
 
 template <class _Tp>
 struct __scalar_hash<_Tp, 1> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    union {
-      _Tp __t;
-      size_t __a;
-    } __u;
-    __u.__t = __v;
-    return __u.__a;
+    if (__libcpp_is_constant_evaluated()) {
+      return __builtin_bit_cast(size_t, __v);
+    } else {
+      union {
+        _Tp __t;
+        size_t __a;
+      } __u;
+      __u.__t = __v;
+      return __u.__a;
+    }
   }
 };
 
 template <class _Tp>
 struct __scalar_hash<_Tp, 2> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    union {
-      _Tp __t;
-      struct {
-        size_t __a;
-        size_t __b;
-      } __s;
-    } __u;
-    __u.__t = __v;
-    return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    struct __result {
+      size_t __a;
+      size_t __b;
+    };
+    if (__libcpp_is_constant_evaluated()) {
+      __result __tmp = __builtin_bit_cast(__result, __v);
+      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
+    } else {
+      union {
+        _Tp __t;
+        __result __s;
+      } __u;
+      __u.__t = __v;
+      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    }
   }
 };
 
 template <class _Tp>
 struct __scalar_hash<_Tp, 3> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    union {
-      _Tp __t;
-      struct {
-        size_t __a;
-        size_t __b;
-        size_t __c;
-      } __s;
-    } __u;
-    __u.__t = __v;
-    return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    struct __result {
+      size_t __a;
+      size_t __b;
+      size_t __c;
+    };
+    if (__libcpp_is_constant_evaluated()) {
+      __result __tmp = __builtin_bit_cast(__result, __v);
+      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
+    } else {
+      union {
+        _Tp __t;
+        __result __s;
+      } __u;
+      __u.__t = __v;
+      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    }
   }
 };
 
 template <class _Tp>
 struct __scalar_hash<_Tp, 4> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    union {
-      _Tp __t;
-      struct {
-        size_t __a;
-        size_t __b;
-        size_t __c;
-        size_t __d;
-      } __s;
-    } __u;
-    __u.__t = __v;
-    return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    struct __result {
+      size_t __a;
+      size_t __b;
+      size_t __c;
+      size_t __d;
+    };
+    if (__libcpp_is_constant_evaluated()) {
+      __result __tmp = __builtin_bit_cast(__result, __v);
+      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
+    } else {
+      union {
+        _Tp __t;
+        struct {
+          size_t __a;
+          size_t __b;
+          size_t __c;
+          size_t __d;
+        } __s;
+      } __u;
+      __u.__t = __v;
+      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    }
   }
 };
 
@@ -326,12 +375,17 @@ constexpr _LIBCPP_HIDE_FROM_ABI inline size_t __hash_combine(size_t __lhs, size_
 template <class _Tp>
 struct _LIBCPP_TEMPLATE_VIS hash<_Tp*> : public __unary_function<_Tp*, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp* __v) const _NOEXCEPT {
-    union {
-      _Tp* __t;
-      size_t __a;
-    } __u;
-    __u.__t = __v;
-    return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    if (__libcpp_is_constant_evaluated()) {
+      size_t __tmp = __builtin_bit_cast(size_t, __v);
+      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
+    } else {
+      union {
+        _Tp* __t;
+        size_t __a;
+      } __u;
+      __u.__t = __v;
+      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
+    }
   }
 };
 

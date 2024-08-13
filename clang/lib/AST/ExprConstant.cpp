@@ -7144,7 +7144,9 @@ class APValueToBufferConverter {
       return false;
     }
 
-    case APValue::LValue:
+    case APValue::LValue: 
+      return visitLValue(Val, Ty, Offset);
+
       llvm_unreachable("LValue subobject in bit_cast?");
     }
     llvm_unreachable("Unhandled APValue::ValueKind");
@@ -7301,6 +7303,15 @@ class APValueToBufferConverter {
   bool visitFloat(const APFloat &Val, QualType Ty, CharUnits Offset) {
     APSInt AsInt(Val.bitcastToAPInt());
     return visitInt(AsInt, Ty, Offset);
+  }
+  
+  bool visitLValue(const APValue &Val, QualType Ty, CharUnits Offset) {
+    // opaque address of base + offset from the base is our opaque address
+    const uintptr_t address = reinterpret_cast<uintptr_t>(Val.getLValueBase().getOpaqueValue()) + static_cast<uintptr_t>(static_cast<intptr_t>(Val.getLValueOffset().getQuantity()));
+    // then we convert it to number and just pass it as APSInt
+    const auto value = APSInt(APInt(sizeof(address)*8u, address, false), false);
+    
+    return visitInt(value, Ty, Offset);
   }
 
 public:
@@ -7618,7 +7629,7 @@ static bool checkBitCastConstexprEligibilityType(SourceLocation Loc,
 
   if (Ty->isUnionType())
     return diag(0);
-  if (Ty->isPointerType())
+  if (Ty->isPointerType() && CheckingDest)
     return diag(1);
   if (Ty->isMemberPointerType())
     return diag(2);
