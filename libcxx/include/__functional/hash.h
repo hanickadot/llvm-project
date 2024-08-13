@@ -10,6 +10,7 @@
 #define _LIBCPP___FUNCTIONAL_HASH_H
 
 #include <__config>
+#include <__algorithm/copy.h>
 #include <__functional/unary_function.h>
 #include <__fwd/functional.h>
 #include <__type_traits/conjunction.h>
@@ -22,6 +23,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <array>
+
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -30,10 +33,11 @@
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _Size>
-inline constexpr _LIBCPP_HIDE_FROM_ABI _Size __loadword(const void* __p) {
+inline constexpr _LIBCPP_HIDE_FROM_ABI _Size __loadword(const char* __p) {
   _Size __r;
-  std::memcpy(&__r, __p, sizeof(__r));
-  return __r;
+  auto buffer = std::array<char, sizeof(__r)>{};
+  std::copy(__p, __p + sizeof(_Size), buffer.data());
+  return __builtin_bit_cast(_Size, buffer);
 }
 
 // We use murmur2 when size_t is 32 bits, and cityhash64 when size_t
@@ -45,12 +49,12 @@ struct __murmur2_or_cityhash;
 template <class _Size>
 struct __murmur2_or_cityhash<_Size, 32> {
   constexpr _LIBCPP_HIDE_FROM_ABI _LIBCPP_DISABLE_UBSAN_UNSIGNED_INTEGER_CHECK _Size
-  operator()(const void* __key, _Size __len) const {
+  operator()(const char* __key, _Size __len) const {
     // murmur2
     const _Size __m             = 0x5bd1e995;
     const _Size __r             = 24;
     _Size __h                   = __len;
-    const unsigned char* __data = static_cast<const unsigned char*>(__key);
+    const char* __data = static_cast<const char*>(__key);
     for (; __len >= 4; __data += 4, __len -= 4) {
       _Size __k = std::__loadword<_Size>(__data);
       __k *= __m;
@@ -81,7 +85,7 @@ template <class _Size>
 struct __murmur2_or_cityhash<_Size, 64> {
   // cityhash64
   constexpr _LIBCPP_HIDE_FROM_ABI _LIBCPP_DISABLE_UBSAN_UNSIGNED_INTEGER_CHECK _Size
-  operator()(const void* __key, _Size __len) const {
+  operator()(const char* __key, _Size __len) const {
     const char* __s = static_cast<const char*>(__key);
     if (__len <= 32) {
       if (__len <= 16) {
@@ -165,9 +169,9 @@ private:
 #endif
     }
     if (__len > 0) {
-      const unsigned char __a = static_cast<unsigned char>(__s[0]);
-      const unsigned char __b = static_cast<unsigned char>(__s[__len >> 1]);
-      const unsigned char __c = static_cast<unsigned char>(__s[__len - 1]);
+      const char __a = static_cast<unsigned char>(__s[0]);
+      const char __b = static_cast<unsigned char>(__s[__len >> 1]);
+      const char __c = static_cast<unsigned char>(__s[__len - 1]);
       const uint32_t __y      = static_cast<uint32_t>(__a) + (static_cast<uint32_t>(__b) << 8);
       const uint32_t __z      = __len + (static_cast<uint32_t>(__c) << 2);
       return __shift_mix(__y * __k2 ^ __z * __k3) * __k2;
@@ -236,8 +240,14 @@ private:
   }
 };
 
-template <class _Tp, size_t = sizeof(_Tp) / sizeof(size_t)>
-struct __scalar_hash;
+template <class _Tp, size_t _Multiply = sizeof(_Tp) / sizeof(size_t)>
+struct __scalar_hash : public __unary_function<_Tp, size_t> {
+  constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(const _Tp & __v) const _NOEXCEPT {
+    using __result_t = std::array<char, _Multiply * sizeof(size_t)>;
+    const auto buffer = __builtin_bit_cast(__result_t, __v);
+    return __murmur2_or_cityhash<size_t>()(buffer.data(), buffer.size());
+  }
+};
 
 template <size_t _Sz> struct __select_same_sized_uint;
 
@@ -260,104 +270,14 @@ template <> struct __select_same_sized_uint<8> {
 template <class _Tp>
 struct __scalar_hash<_Tp, 0> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    if (__libcpp_is_constant_evaluated()) {
-      return __builtin_bit_cast(typename __select_same_sized_uint<sizeof(_Tp)>::__type, __v);
-    } else {
-      union {
-        _Tp __t;
-        size_t __a;
-      } __u;
-      __u.__a = 0;
-      __u.__t = __v;
-      return __u.__a;
-    }
+    return static_cast<size_t>(__builtin_bit_cast(typename __select_same_sized_uint<sizeof(_Tp)>::__type, __v));
   }
 };
 
 template <class _Tp>
 struct __scalar_hash<_Tp, 1> : public __unary_function<_Tp, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    if (__libcpp_is_constant_evaluated()) {
-      return __builtin_bit_cast(size_t, __v);
-    } else {
-      union {
-        _Tp __t;
-        size_t __a;
-      } __u;
-      __u.__t = __v;
-      return __u.__a;
-    }
-  }
-};
-
-template <class _Tp>
-struct __scalar_hash<_Tp, 2> : public __unary_function<_Tp, size_t> {
-  constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    struct __result {
-      size_t __a;
-      size_t __b;
-    };
-    if (__libcpp_is_constant_evaluated()) {
-      __result __tmp = __builtin_bit_cast(__result, __v);
-      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
-    } else {
-      union {
-        _Tp __t;
-        __result __s;
-      } __u;
-      __u.__t = __v;
-      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
-    }
-  }
-};
-
-template <class _Tp>
-struct __scalar_hash<_Tp, 3> : public __unary_function<_Tp, size_t> {
-  constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    struct __result {
-      size_t __a;
-      size_t __b;
-      size_t __c;
-    };
-    if (__libcpp_is_constant_evaluated()) {
-      __result __tmp = __builtin_bit_cast(__result, __v);
-      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
-    } else {
-      union {
-        _Tp __t;
-        __result __s;
-      } __u;
-      __u.__t = __v;
-      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
-    }
-  }
-};
-
-template <class _Tp>
-struct __scalar_hash<_Tp, 4> : public __unary_function<_Tp, size_t> {
-  constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp __v) const _NOEXCEPT {
-    struct __result {
-      size_t __a;
-      size_t __b;
-      size_t __c;
-      size_t __d;
-    };
-    if (__libcpp_is_constant_evaluated()) {
-      __result __tmp = __builtin_bit_cast(__result, __v);
-      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
-    } else {
-      union {
-        _Tp __t;
-        struct {
-          size_t __a;
-          size_t __b;
-          size_t __c;
-          size_t __d;
-        } __s;
-      } __u;
-      __u.__t = __v;
-      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
-    }
+    return __builtin_bit_cast(size_t, __v);
   }
 };
 
@@ -375,17 +295,9 @@ constexpr _LIBCPP_HIDE_FROM_ABI inline size_t __hash_combine(size_t __lhs, size_
 template <class _Tp>
 struct _LIBCPP_TEMPLATE_VIS hash<_Tp*> : public __unary_function<_Tp*, size_t> {
   constexpr _LIBCPP_HIDE_FROM_ABI size_t operator()(_Tp* __v) const _NOEXCEPT {
-    if (__libcpp_is_constant_evaluated()) {
-      size_t __tmp = __builtin_bit_cast(size_t, __v);
-      return __murmur2_or_cityhash<size_t>()(&__tmp, sizeof(__tmp));
-    } else {
-      union {
-        _Tp* __t;
-        size_t __a;
-      } __u;
-      __u.__t = __v;
-      return __murmur2_or_cityhash<size_t>()(&__u, sizeof(__u));
-    }
+    using __result_t = std::array<char, sizeof(_Tp*)>;
+    auto buffer = __builtin_bit_cast(__result_t, __v);
+    return __murmur2_or_cityhash<size_t>()(buffer.data(), buffer.size());
   }
 };
 
@@ -506,35 +418,27 @@ struct _LIBCPP_TEMPLATE_VIS hash<long double> : public __scalar_hash<long double
     if (__v == 0.0L)
       return 0;
 #if defined(__i386__) || (defined(__x86_64__) && defined(__ILP32__))
-    // Zero out padding bits
-    union {
-      long double __t;
-      struct {
-        size_t __a;
-        size_t __b;
-        size_t __c;
-        size_t __d;
-      } __s;
-    } __u;
-    __u.__s.__a = 0;
-    __u.__s.__b = 0;
-    __u.__s.__c = 0;
-    __u.__s.__d = 0;
-    __u.__t     = __v;
-    return __u.__s.__a ^ __u.__s.__b ^ __u.__s.__c ^ __u.__s.__d;
+    struct __result_t {
+      size_t __a;
+      size_t __b;
+      size_t __c;
+    };
+    
+    static_assert(sizeof(__result_t) == sizeof(long double));
+    
+    const auto __u = __builtin_bit_cast(__result_t, __v);
+    return __u.__a ^ __u.__b ^ __u.__c;
 #elif defined(__x86_64__)
     // Zero out padding bits
-    union {
-      long double __t;
-      struct {
-        size_t __a;
-        size_t __b;
-      } __s;
-    } __u;
-    __u.__s.__a = 0;
-    __u.__s.__b = 0;
-    __u.__t     = __v;
-    return __u.__s.__a ^ __u.__s.__b;
+    struct __result_t {
+      size_t __a;
+      size_t __b;
+    };
+    
+    static_assert(sizeof(__result_t) == sizeof(long double));
+    
+    const auto __u = __builtin_bit_cast(__result_t, __v);
+    return __u.__a ^ __u.__b;
 #else
     return __scalar_hash<long double>::operator()(__v);
 #endif
