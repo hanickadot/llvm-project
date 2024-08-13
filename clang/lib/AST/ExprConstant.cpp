@@ -4398,6 +4398,12 @@ handleLValueToRValueConversion(EvalInfo &Info, const Expr *Conv, QualType Type,
 
   // Check for special cases where there is no existing APValue to look at.
   const Expr *Base = LVal.Base.dyn_cast<const Expr*>();
+  
+  if (LVal.Base.Metadata != 0) {
+    Info.FFDiag(Conv, diag::note_constexpr_dereferencing_tagged_pointer);
+    return false;
+  }
+    
 
   AccessKinds AK =
       WantObjectRepresentation ? AK_ReadObjectRepresentation : AK_Read;
@@ -9642,6 +9648,33 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BI__addressof:
   case Builtin::BI__builtin_addressof:
     return evaluateLValue(E->getArg(0), Result);
+  case Builtin::BI__builtin_pointer_tag: {
+    APSInt Value, Mask;
+    if (!evaluatePointer(E->getArg(0), Result))
+      return Error(E);
+    
+    if (!EvaluateInteger(E->getArg(1), Value, Info))
+      return Error(E);
+    
+    if (!EvaluateInteger(E->getArg(2), Mask, Info))
+      return Error(E);
+    
+    Result.Base.Metadata = (Result.Base.Metadata & ~Mask.getLimitedValue()) | (Value.getLimitedValue() & Mask.getLimitedValue());
+    return true;
+  }
+    
+  case Builtin::BI__builtin_pointer_untag: {
+    // TODO implement me
+    APSInt Mask;
+    if (!evaluatePointer(E->getArg(0), Result))
+        return Error(E);
+    
+    if (!EvaluateInteger(E->getArg(1), Mask, Info))
+      return Error(E);
+    
+    Result.Base.Metadata = (Result.Base.Metadata & ~Mask.getLimitedValue());
+    return true;
+  }
   case Builtin::BI__builtin_assume_aligned: {
     // We need to be very careful here because: if the pointer does not have the
     // asserted alignment, then the behavior is undefined, and undefined
@@ -12531,6 +12564,18 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   default:
     return false;
 
+  case Builtin::BI__builtin_pointer_tag_value: {
+    LValue Pointer;
+    APSInt Mask;
+    
+    if (!EvaluatePointer(E->getArg(0), Pointer, Info))
+      return Error(E);
+  
+    if (!EvaluateInteger(E->getArg(1), Mask, Info))
+      return Error(E);
+  
+    return Success(Pointer.Base.Metadata & Mask.getLimitedValue(), E);
+  }
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     // The type was checked when we built the expression.
