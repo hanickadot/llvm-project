@@ -4792,3 +4792,9 @@ def PointerTagValue : LangBuiltin<"CXX_LANG"> {
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "size_t(void*, size_t)";
 }
+
+def IsWithinLifeTime : Builtin {
+  let Spellings = ["__builtin_is_within_lifetime"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "bool(void const*)";
+}

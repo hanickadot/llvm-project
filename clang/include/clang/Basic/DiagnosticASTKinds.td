@@ -230,7 +230,7 @@ def note_constexpr_access_unsized_array : Note<
 def note_constexpr_access_inactive_union_member : Note<
   "%select{read of|read of|assignment to|increment of|decrement of|"
   "member call on|dynamic_cast of|typeid applied to|"
-  "construction of subobject of|destruction of}0 "
+  "construction of subobject of|destruction of|check lifetime of}0 "
   "member %1 of union with %select{active member %3|no active member}2 "
   "is not allowed in a constant expression">;
 def note_constexpr_union_member_change_during_init : Note<
