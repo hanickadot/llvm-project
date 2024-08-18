@@ -13,6 +13,7 @@
 #include <__config>
 #include <__type_traits/is_trivially_copyable.h>
 #include <__assert>
+#include <__fwd/tuple.h>
 #include "has_single_bit.h"
 #include "popcount.h"
 
@@ -30,10 +31,6 @@ template <class _T, uintptr_t _Mask = pointer_tag_mask<alignof(_T)>> class tagge
 
 template <class _T, uintptr_t _Mask = pointer_tag_mask<alignof(_T)>> 
 [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr auto tag_pointer(_T * _ptr, uintptr_t _value) noexcept -> tagged_pointer<_T, _Mask>;
-
-template <typename _T, uintptr_t _Mask> [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr _T * untag_pointer(tagged_pointer<_T, _Mask> _ptr) noexcept;
-
-template <typename _T, uintptr_t _Mask> [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr uintptr_t obtain_pointer_tag(tagged_pointer<_T, _Mask> _ptr) noexcept;
 
 struct unsafe_tag_t { };
 
@@ -60,26 +57,55 @@ public:
   
   _LIBCPP_HIDE_FROM_ABI constexpr friend auto tag_pointer<_T, _Mask>(_T * ptr, uintptr_t _value) noexcept -> tagged_pointer<_T, _Mask>;
   
-  _LIBCPP_HIDE_FROM_ABI constexpr friend _T * untag_pointer<_T, _Mask>(tagged_pointer<_T, _Mask> _ptr) noexcept;
-  _LIBCPP_HIDE_FROM_ABI constexpr friend uintptr_t obtain_pointer_tag<_T, _Mask>(tagged_pointer<_T, _Mask> _ptr) noexcept;
-};
-
-template <typename _T, uintptr_t _Mask> [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr _T * untag_pointer(tagged_pointer<_T, _Mask> _ptr) noexcept {
+  [[nodiscard]] constexpr _T * pointer() const noexcept {
 #if __has_builtin(__builtin_pointer_untag)
-    return static_cast<_T*>(__builtin_pointer_untag(_ptr._ptr, _Mask));
+    return static_cast<_T*>(__builtin_pointer_untag(_ptr, _Mask));
 #else
     // non-constexpr variant
-    return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(_ptr._ptr) & ~_Mask);
+    return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(_ptr) & ~_Mask);
 #endif
-}
-template <typename _T, uintptr_t _Mask> [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr uintptr_t obtain_pointer_tag(tagged_pointer<_T, _Mask> _ptr) noexcept {
+  }
+  
+  [[nodiscard]] constexpr uintptr_t value() const noexcept {
 #if __has_builtin(__builtin_pointer_tag_value)
-  return __builtin_pointer_tag_value(_ptr._ptr, _Mask);
+    return __builtin_pointer_tag_value(_ptr, _Mask);
 #else
-  // non-constexpr variant
-  return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(_ptr._ptr) & _Mask);
+    // non-constexpr variant
+    return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(_ptr) & _Mask);
 #endif
-}
+  }
+  
+  template <std::size_t I> [[nodiscard]] constexpr auto get() const noexcept {
+    static_assert(I <= 1, "std::tagged_pointer has only 2 elements!");
+    if constexpr (I == 0) {
+      return pointer();
+    } else {
+      return value();
+    }
+  }
+};
+
+template <typename T, uintptr_t Mask> struct tuple_size<tagged_pointer<T, Mask>>: std::integral_constant<std::size_t, 2> { };
+
+template<typename T, uintptr_t Mask, size_t I>
+struct tuple_element<I, tagged_pointer<T, Mask>>
+{
+    static_assert(I < 2, "std::tagged_pointer has only 2 elements!");
+};
+
+template<typename T, uintptr_t Mask>
+struct tuple_element<0, tagged_pointer<T, Mask>>
+{
+    using type = T *;
+};
+ 
+template<typename T,uintptr_t Mask>
+struct tuple_element<1, tagged_pointer<T, Mask>>
+{
+    using type = uintptr_t;
+};
+
+
 
 template <class _T, uintptr_t _Mask> 
 [[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr auto tag_pointer(_T * _ptr, uintptr_t _value) noexcept -> tagged_pointer<_T, _Mask> {
@@ -89,8 +115,8 @@ template <class _T, uintptr_t _Mask>
   // non-constexpr variant
   auto _result = tagged_pointer<_T, _Mask>{reinterpret_cast<T*>((reinterpret_cast<uintptr_t>(_ptr) & ~_Mask) | (_value & _mask))};
 #endif
-  _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(std::obtain_pointer_tag(_result) == _value, "value can't be recovered with provided mask");
-  _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(std::untag_pointer(_result) == _ptr, "pointer can't be recovered with provided mask");
+  _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(_result.value() == _value, "value can't be recovered with provided mask");
+  _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(_result.pointer() == _ptr, "pointer can't be recovered with provided mask");
   return _result;
 }
 
