@@ -231,6 +231,7 @@ set(files
   __bit/endian.h
   __bit/has_single_bit.h
   __bit/invert_if.h
+  __bit/pointer_tag.h
   __bit/popcount.h
   __bit/rotate.h
   __bit_reference

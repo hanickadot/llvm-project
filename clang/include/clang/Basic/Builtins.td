@@ -4775,19 +4775,19 @@ def ArithmeticFence : LangBuiltin<"ALL_LANGUAGES"> {
   let Prototype = "void(...)";
 }
 
-def PointerTag : LangBuiltin<"CXX_LANG"> {
+def PointerTag : Builtin {
   let Spellings = ["__builtin_pointer_tag"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void*(void*, size_t, size_t)";
 }
 
-def PointerUntag : LangBuiltin<"CXX_LANG"> {
+def PointerUntag : Builtin {
   let Spellings = ["__builtin_pointer_untag"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void*(void*, size_t)";
 }
 
-def PointerTagValue : LangBuiltin<"CXX_LANG"> {
+def PointerTagValue : Builtin {
   let Spellings = ["__builtin_pointer_tag_value"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "size_t(void*, size_t)";
