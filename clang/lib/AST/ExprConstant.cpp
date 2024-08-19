@@ -4666,7 +4666,7 @@ struct CompoundAssignSubobjectHandler {
     if (!checkConst(SubobjType))
       return false;
 
-    if (!SubobjType->isIntegerType()) {
+    if (!SubobjType->isIntegerType() && !SubobjType->isEnumeralType()) {
       // We don't support compound assignment on integer-cast-to-pointer
       // values.
       Info.FFDiag(E);
@@ -7984,7 +7984,8 @@ public:
   }
 
   bool VisitCXXReinterpretCastExpr(const CXXReinterpretCastExpr *E) {
-    CCEDiag(E, diag::note_constexpr_invalid_cast) << 0;
+    if (!Info.Ctx.getLangOpts().CPlusPlus26)
+      CCEDiag(E, diag::note_constexpr_invalid_cast) << 0;
     return static_cast<Derived*>(this)->VisitCastExpr(E);
   }
   bool VisitCXXDynamicCastExpr(const CXXDynamicCastExpr *E) {
@@ -9508,6 +9509,9 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
           (HasValidResult &&
            Info.Ctx.hasSimilarType(Result.Designator.getType(Info.Ctx),
                                    E->getType()->getPointeeType()));
+      
+      bool BothAreIntsOrEnums = (E->getType()->getPointeeType()->isIntegerType() || E->getType()->getPointeeType()->isEnumeralType()) && (Result.Designator.getType(Info.Ctx)->isIntegerType() || Result.Designator.getType(Info.Ctx)->isEnumeralType());
+      
       // 1. We'll allow it in std::allocator::allocate, and anything which that
       //    calls.
       // 2. HACK 2022-03-28: Work around an issue with libstdc++'s
@@ -9520,6 +9524,8 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
            IsDeclSourceLocationCurrent(Info.CurrentCall->Callee) ||
            Info.getLangOpts().CPlusPlus26)) {
         // Permitted.
+      } else if (BothAreIntsOrEnums && Info.Ctx.getIntWidth(E->getType()->getPointeeType()) == Info.Ctx.getIntWidth(Result.Designator.getType(Info.Ctx))) {
+        // Permitted now :)
       } else {
         if (SubExpr->getType()->isVoidPointerType() &&
             Info.getLangOpts().CPlusPlus) {
@@ -9531,9 +9537,10 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
           else
             CCEDiag(E, diag::note_constexpr_invalid_cast)
                 << 3 << SubExpr->getType();
-        } else
+        } else {
           CCEDiag(E, diag::note_constexpr_invalid_cast)
               << 2 << Info.Ctx.getLangOpts().CPlusPlus;
+        }
         Result.Designator.setInvalid();
       }
     }
@@ -9747,7 +9754,7 @@ bool PointerExprEvaluator::VisitCallExpr(const CallExpr *E) {
 // Determine if T is a character type for which we guarantee that
 // sizeof(T) == 1.
 static bool isOneByteCharacterType(QualType T) {
-  return T->isCharType() || T->isChar8Type();
+  return T->isCharType() || T->isChar8Type() || T->isStdByteType();
 }
 
 bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
@@ -11774,11 +11781,10 @@ public:
   bool Success(const llvm::APSInt &SI, const Expr *E, APValue &Result) {
     assert(E->getType()->isIntegralOrEnumerationType() &&
            "Invalid evaluation result.");
-    assert(SI.isSigned() == E->getType()->isSignedIntegerOrEnumerationType() &&
-           "Invalid evaluation result.");
     assert(SI.getBitWidth() == Info.Ctx.getIntWidth(E->getType()) &&
            "Invalid evaluation result.");
     Result = APValue(SI);
+    Result.getInt().setIsUnsigned(E->getType()->isUnsignedIntegerOrEnumerationType());
     return true;
   }
   bool Success(const llvm::APSInt &SI, const Expr *E) {
