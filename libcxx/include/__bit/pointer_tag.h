@@ -35,11 +35,16 @@ template <class _T, uintptr_t _Mask = pointer_tag_mask<alignof(_T)>>
   auto _result = tagged_pointer<_T, _Mask>{static_cast<_T*>(__builtin_pointer_tag(_ptr, _value, _Mask))};
 #else
   // non-constexpr variant
-  auto _result = tagged_pointer<_T, _Mask>{reinterpret_cast<T*>((reinterpret_cast<uintptr_t>(_ptr) & ~_Mask) | (_value & _mask))};
+  auto _result = tagged_pointer<_T, _Mask>{reinterpret_cast<T*>((reinterpret_cast<uintptr_t>(_ptr) & ~_Mask) | (_value & _Mask))};
 #endif
   _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(_result.value() == _value, "value can't be recovered with provided mask");
   _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(_result.pointer() == _ptr, "pointer can't be recovered with provided mask");
   return _result;
+}
+
+template <uintptr_t _Mask, class _T> 
+[[nodiscard]] _LIBCPP_HIDE_FROM_ABI constexpr auto tag_pointer(_T * _ptr, uintptr_t _value) noexcept -> tagged_pointer<_T, _Mask> {
+  return tag_pointer<_T, _Mask>(_ptr, _value);
 }
 
 template <class _T, uintptr_t _Mask = pointer_tag_mask<alignof(_T)>> 
