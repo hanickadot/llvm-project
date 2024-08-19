@@ -64,6 +64,7 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <iostream>
 
 #define DEBUG_TYPE "exprconstant"
 
@@ -1522,7 +1523,7 @@ CallStackFrame::~CallStackFrame() {
 }
 
 static bool isRead(AccessKinds AK) {
-  return AK == AK_Read || AK == AK_ReadObjectRepresentation;
+  return AK == AK_Read || AK == AK_ReadObjectRepresentation || AK == AK_IsWithinLifetime;
 }
 
 static bool isModification(AccessKinds AK) {
@@ -1532,7 +1533,7 @@ static bool isModification(AccessKinds AK) {
   case AK_MemberCall:
   case AK_DynamicCast:
   case AK_TypeId:
-  case AK_LifeTimeCheck:
+  case AK_IsWithinLifetime:
     return false;
   case AK_Assign:
   case AK_Increment:
@@ -1550,7 +1551,7 @@ static bool isAnyAccess(AccessKinds AK) {
 
 /// Is this an access per the C++ definition?
 static bool isFormalAccess(AccessKinds AK) {
-  return isAnyAccess(AK) && AK != AK_Construct && AK != AK_Destroy;
+  return isAnyAccess(AK) && AK != AK_Construct && AK != AK_Destroy && AK != AK_IsWithinLifetime;
 }
 
 /// Is this kind of axcess valid on an indeterminate object value?
@@ -1562,11 +1563,11 @@ static bool isValidIndeterminateAccess(AccessKinds AK) {
     // These need the object's value.
     return false;
 
+  case AK_IsWithinLifetime:
   case AK_ReadObjectRepresentation:
   case AK_Assign:
   case AK_Construct:
   case AK_Destroy:
-  case AK_LifeTimeCheck:
     // Construction and destruction don't need the value.
     return true;
 
@@ -1916,6 +1917,8 @@ static bool EvaluateFixedPointOrInteger(const Expr *E, APFixedPoint &Result,
 /// Evaluate only a fixed point expression into an APResult.
 static bool EvaluateFixedPoint(const Expr *E, APFixedPoint &Result,
                                EvalInfo &Info);
+
+static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string>;
 
 //===----------------------------------------------------------------------===//
 // Misc utilities
@@ -3709,12 +3712,12 @@ struct CompleteObject {
     // In C++14 onwards, it is permitted to read a mutable member whose
     // lifetime began within the evaluation.
     // FIXME: Should we also allow this in C++11?
-    if (!Info.getLangOpts().CPlusPlus14)
+    if (!Info.getLangOpts().CPlusPlus14 && AK != AccessKinds::AK_IsWithinLifetime)
       return false;
     return lifetimeStartedInEvaluation(Info, Base, /*MutableSubobject*/true);
   }
 
-  explicit operator bool() const { return !Type.isNull(); }
+  explicit operator bool() const { return !Type.isNull() && Value != nullptr; }
 };
 } // end anonymous namespace
 
@@ -3741,7 +3744,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     // A diagnostic will have already been produced.
     return handler.failed();
   if (Sub.isOnePastTheEnd() || Sub.isMostDerivedAnUnsizedArray()) {
-    if (handler.AccessKind != AK_LifeTimeCheck) {
+    if (handler.AccessKind != AK_IsWithinLifetime) {
       if (Info.getLangOpts().CPlusPlus11)
         Info.FFDiag(E, Sub.isOnePastTheEnd()
                            ? diag::note_constexpr_access_past_end
@@ -3764,7 +3767,9 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     if ((O->isAbsent() && !(handler.AccessKind == AK_Construct && I == N)) ||
         (O->isIndeterminate() &&
          !isValidIndeterminateAccess(handler.AccessKind))) {
-      if (!Info.checkingPotentialConstantExpression() && handler.AccessKind != AK_LifeTimeCheck)
+      if (handler.AccessKind == AK_IsWithinLifetime)
+        return handler.failed();
+      if (!Info.checkingPotentialConstantExpression())
         Info.FFDiag(E, diag::note_constexpr_access_uninit)
             << handler.AccessKind << O->isIndeterminate()
             << E->getSourceRange();
@@ -3806,12 +3811,10 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
             if (auto *E = Obj.Base.dyn_cast<const Expr *>())
               Loc = E->getExprLoc();
           }
-          if (handler.AccessKind != AK_LifeTimeCheck) {
-            Info.FFDiag(E, diag::note_constexpr_access_volatile_obj, 1)
-                << handler.AccessKind << DiagKind << Decl;
-            Info.Note(Loc, diag::note_constexpr_volatile_here) << DiagKind;
-          }
-        } else if (handler.AccessKind != AK_LifeTimeCheck) {
+          Info.FFDiag(E, diag::note_constexpr_access_volatile_obj, 1)
+              << handler.AccessKind << DiagKind << Decl;
+          Info.Note(Loc, diag::note_constexpr_volatile_here) << DiagKind;
+        } else {
           Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
         }
         return handler.failed();
@@ -3849,13 +3852,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       if (CAT->getSize().ule(Index)) {
         // Note, it should not be possible to form a pointer with a valid
         // designator which points more than one past the end of the array.
-        if (handler.AccessKind != AK_LifeTimeCheck) {
-          if (Info.getLangOpts().CPlusPlus11)
-            Info.FFDiag(E, diag::note_constexpr_access_past_end)
-              << handler.AccessKind;
-          else
-            Info.FFDiag(E);
-        }
+        if (Info.getLangOpts().CPlusPlus11)
+          Info.FFDiag(E, diag::note_constexpr_access_past_end)
+            << handler.AccessKind;
+        else
+          Info.FFDiag(E);
         return handler.failed();
       }
 
@@ -3875,13 +3876,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       // Next subobject is a complex number.
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       if (Index > 1) {
-        if (handler.AccessKind != AK_LifeTimeCheck) {
-          if (Info.getLangOpts().CPlusPlus11)
-            Info.FFDiag(E, diag::note_constexpr_access_past_end)
-              << handler.AccessKind;
-          else
-            Info.FFDiag(E);
-        }
+        if (Info.getLangOpts().CPlusPlus11)
+          Info.FFDiag(E, diag::note_constexpr_access_past_end)
+            << handler.AccessKind;
+        else
+          Info.FFDiag(E);
         return handler.failed();
       }
 
@@ -3901,21 +3900,17 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       unsigned NumElements = VT->getNumElements();
       if (Index == NumElements) {
-        if (handler.AccessKind != AK_LifeTimeCheck) {
-          if (Info.getLangOpts().CPlusPlus11)
-            Info.FFDiag(E, diag::note_constexpr_access_past_end)
-                << handler.AccessKind;
-          else
-            Info.FFDiag(E);
-        }
+        if (Info.getLangOpts().CPlusPlus11)
+          Info.FFDiag(E, diag::note_constexpr_access_past_end)
+              << handler.AccessKind;
+        else
+          Info.FFDiag(E);
         return handler.failed();
       }
 
       if (Index > NumElements) {
-        if (handler.AccessKind != AK_LifeTimeCheck) {
-          Info.CCEDiag(E, diag::note_constexpr_array_index)
-              << Index << /*array*/ 0 << NumElements;
-        }
+        Info.CCEDiag(E, diag::note_constexpr_array_index)
+            << Index << /*array*/ 0 << NumElements;
         return handler.failed();
       }
 
@@ -3925,11 +3920,9 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     } else if (const FieldDecl *Field = getAsField(Sub.Entries[I])) {
       if (Field->isMutable() &&
           !Obj.mayAccessMutableMembers(Info, handler.AccessKind)) {
-        if (handler.AccessKind != AK_LifeTimeCheck) {
-          Info.FFDiag(E, diag::note_constexpr_access_mutable, 1)
-            << handler.AccessKind << Field;
-          Info.Note(Field->getLocation(), diag::note_declared_at);
-        }
+        Info.FFDiag(E, diag::note_constexpr_access_mutable, 1)
+          << handler.AccessKind << Field;
+        Info.Note(Field->getLocation(), diag::note_declared_at);
         return handler.failed();
       }
 
@@ -3947,11 +3940,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
             // active union member rather than reporting the prior active union
             // member. We'll need to fix nullptr_t to not use APValue() as its
             // representation first.
-            //__builtin_debugtrap();
-            if (handler.AccessKind != AK_LifeTimeCheck) {
-              Info.FFDiag(E, diag::note_constexpr_access_inactive_union_member)
+            if (handler.AccessKind == AK_IsWithinLifetime)
+              return handler.failed();
+            
+            Info.FFDiag(E, diag::note_constexpr_access_inactive_union_member)
                   << handler.AccessKind << Field << !UnionField << UnionField;
-            }
             return handler.failed();
           }
         }
@@ -4145,9 +4138,11 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
     std::tie(Frame, Depth) =
         Info.getCallFrameAndDepth(LVal.getLValueCallIndex());
     if (!Frame) {
-      Info.FFDiag(E, diag::note_constexpr_lifetime_ended, 1)
-        << AK << LVal.Base.is<const ValueDecl*>();
-      NoteLValueLocation(Info, LVal.Base);
+      if (AK != AccessKinds::AK_IsWithinLifetime) {
+        Info.FFDiag(E, diag::note_constexpr_lifetime_ended, 1)
+            << AK << LVal.Base.is<const ValueDecl *>();
+        NoteLValueLocation(Info, LVal.Base);
+      }
       return CompleteObject();
     }
   }
@@ -4176,6 +4171,8 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
     // This is the object whose initializer we're evaluating, so its lifetime
     // started in the current evaluation.
     BaseVal = Info.EvaluatingDeclValue;
+    if (AK == AccessKinds::AK_IsWithinLifetime)
+      return CompleteObject(); // Not within lifetime
   } else if (const ValueDecl *D = LVal.Base.dyn_cast<const ValueDecl *>()) {
     // Allow reading from a GUID declaration.
     if (auto *GD = dyn_cast<MSGuidDecl>(D)) {
@@ -4307,7 +4304,8 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   } else if (DynamicAllocLValue DA = LVal.Base.dyn_cast<DynamicAllocLValue>()) {
     std::optional<DynAlloc *> Alloc = Info.lookupDynamicAlloc(DA);
     if (!Alloc) {
-      Info.FFDiag(E, diag::note_constexpr_access_deleted_object) << AK;
+      if (AK != AccessKinds::AK_IsWithinLifetime)
+        Info.FFDiag(E, diag::note_constexpr_access_deleted_object) << AK;
       return CompleteObject();
     }
     return CompleteObject(LVal.Base, &(*Alloc)->Value,
@@ -4396,11 +4394,11 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
 
 namespace {
 
-  struct IsWithinLifetimeProbeHandle {
+  struct IsWithinLifetimeHandler {
     EvalInfo &Info;
     const Expr *E;
     bool & Result;
-    static constexpr AccessKinds AccessKind = AK_LifeTimeCheck;
+    static constexpr AccessKinds AccessKind = AK_IsWithinLifetime;
     
     using result_type = bool;
     
@@ -4413,78 +4411,48 @@ namespace {
       return true;
     }
   };
-
 }
 
-static bool checkLifeTimeOfObject(EvalInfo &Info, const Expr *E,
-                             const CompleteObject &Obj,
-                             const SubobjectDesignator &Sub, bool & Result) {
-  IsWithinLifetimeProbeHandle Handler = {Info, E, Result};
-  return findSubobject(Info, E, Obj, Sub, Handler);
-}
-
-static bool handleIsWithingLifetime(EvalInfo &Info, const Expr *Conv, QualType Type, const LValue &LVal, bool &Result) {
-  if (LVal.Designator.Invalid)
+static bool handleIsWithingLifetime(EvalInfo &Info, const Expr *E, QualType Type, const LValue &LVal, bool &Result) {
+  if (!Info.InConstantContext)
+    return false;
+  
+  if (E->isValueDependent())
     return false;
 
-  // Check for special cases where there is no existing APValue to look at.
-  const Expr *Base = LVal.Base.dyn_cast<const Expr*>();
-  
-  if (LVal.Base.Metadata != 0) {
-    Info.FFDiag(Conv, diag::note_constexpr_dereferencing_tagged_pointer);
+  if (LVal.getLValueBase().Metadata != 0) {
+    Info.FFDiag(E, diag::note_constexpr_dereferencing_tagged_pointer);
     return false;
   }
     
-
-  if (Base && !LVal.getLValueCallIndex() && !Type.isVolatileQualified()) {
-    if (const CompoundLiteralExpr *CLE = dyn_cast<CompoundLiteralExpr>(Base)) {
-      // In C99, a CompoundLiteralExpr is an lvalue, and we defer evaluating the
-      // initializer until now for such expressions. Such an expression can't be
-      // an ICE in C, so this only matters for fold.
-      if (Type.isVolatileQualified()) {
-        Info.FFDiag(Conv);
-        return false;
-      }
-
-      APValue Lit;
-      if (!Evaluate(Lit, Info, CLE->getInitializer()))
-        return false;
-
-      // According to GCC info page:
-      //
-      // 6.28 Compound Literals
-      //
-      // As an optimization, G++ sometimes gives array compound literals longer
-      // lifetimes: when the array either appears outside a function or has a
-      // const-qualified type. If foo and its initializer had elements of type
-      // char *const rather than char *, or if foo were a global variable, the
-      // array would have static storage duration. But it is probably safest
-      // just to avoid the use of array compound literals in C++ code.
-      //
-      // Obey that rule by checking constness for converted array types.
-
-      QualType CLETy = CLE->getType();
-      if (CLETy->isArrayType() && !Type->isArrayType()) {
-        if (!CLETy.isConstant(Info.Ctx)) {
-          Info.FFDiag(Conv);
-          Info.Note(CLE->getExprLoc(), diag::note_declared_at);
-          return false;
-        }
-      }
-
-      CompleteObject LitObj(LVal.Base, &Lit, Base->getType());
-      return checkLifeTimeOfObject(Info, Conv, LitObj, LVal.Designator, Result);
-      //return extractSubobject(Info, Conv, LitObj, LVal.Designator, RVal, AK);
-    } else if (isa<StringLiteral>(Base) || isa<PredefinedExpr>(Base)) {
-      // Special-case character extraction so we don't have to construct an
-      // APValue for the whole string.
-      Result = true;
-      return true;
-    }
+  if (LVal.isNullPointer() || LVal.getLValueBase().isNull())
+    return false;
+  
+  QualType T = LVal.getLValueBase().getType();
+  if (T->isFunctionType())
+    return false;
+  assert(T->isObjectType());
+  // Hypothetical array element is not an object
+  if (LVal.getLValueDesignator().isOnePastTheEnd())
+    return false;
+  assert(LVal.getLValueDesignator().isValidSubobject() &&
+         "Unchecked case for valid subobject");
+  // All other ill-formed values should have failed EvaluatePointer, so the
+  // object should be a pointer to an object that is usable in a constant
+  // expression or whose complete lifetime began within the expression
+  CompleteObject CO =
+      findCompleteObject(Info, E, AccessKinds::AK_IsWithinLifetime, LVal, T);
+  if (!CO) {
+    Result = false;
+    return true;
   }
-
-  CompleteObject Obj = findCompleteObject(Info, Conv, AK_ReadObjectRepresentation, LVal, Type);
-  return Obj && checkLifeTimeOfObject(Info, Conv, Obj, LVal.Designator, Result);
+  
+  IsWithinLifetimeHandler handler{Info, E, Result};
+  if (!findSubobject(Info, E, CO, LVal.getLValueDesignator(), handler)) {
+    return false;
+  }
+  
+  return true;
 }
 
 /// Perform an lvalue-to-rvalue conversion on the given glvalue. This
@@ -12695,16 +12663,19 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return Success(Pointer.Base.Metadata & Mask.getLimitedValue(), E);
   }
   case Builtin::BI__builtin_is_within_lifetime: {
+    
     LValue PointerToUnionMember;
+    
     if (!EvaluatePointer(E->getArg(0), PointerToUnionMember, Info)) 
       return Error(E);
-    
+
     bool Result;
     if (!handleIsWithingLifetime(Info, E->getArg(0), E->getArg(0)->getType(), PointerToUnionMember, Result)) {
       return Error(E);
     }
-    
+  
     return Success(Result, E);
+    
   }
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
@@ -15932,6 +15903,15 @@ public:
     case Builtin::BI__builtin_operator_delete:
       return HandleOperatorDeleteCall(Info, E);
 
+    case Builtin::BI__constexpr_print:
+    {
+      auto result = ConvertPointerToString(E->getArg(0), Info);
+      if (result) {
+        std::cout << *result << "\n";
+      }
+      return result.has_value();
+    }
+
     default:
       return false;
     }
@@ -17449,4 +17429,31 @@ bool Expr::tryEvaluateStrLen(uint64_t &Result, ASTContext &Ctx) const {
   Expr::EvalStatus Status;
   EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantFold);
   return EvaluateBuiltinStrLen(this, Result, Info);
+}
+
+static auto ConvertPointerToString(const Expr * PointerExpression, EvalInfo & Info) -> std::optional<std::string> {
+  LValue String;
+
+  if (!::EvaluatePointer(PointerExpression, String, Info))
+    return std::nullopt;
+
+  QualType CharTy = PointerExpression->getType()->getPointeeType();
+
+  std::string Result;
+
+  while (true) {
+    APValue Char;
+    if (!handleLValueToRValueConversion(Info, PointerExpression, CharTy, String, Char))
+      return std::nullopt;
+
+    APSInt C = Char.getInt();
+
+    if (C == 0) {
+      return Result;
+    }
+
+    Result.push_back(static_cast<char>(C.getExtValue()));
+    if (!HandleLValueArrayAdjustment(Info, PointerExpression, String, CharTy, 1))
+      return std::nullopt;
+  }
 }

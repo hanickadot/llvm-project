@@ -4795,6 +4795,12 @@ def PointerTagValue : Builtin {
 
 def IsWithinLifeTime : Builtin {
   let Spellings = ["__builtin_is_within_lifetime"];
-  let Attributes = [Constexpr, NoThrow];
+  let Attributes = [Consteval, NoThrow];
   let Prototype = "bool(void const*)";
+}
+
+def ConstexprPrint : Builtin {
+  let Spellings = ["__constexpr_print"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void(char const*)";
 }

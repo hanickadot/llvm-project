@@ -37,6 +37,7 @@ HEADER(STRINGS_H, "strings.h")
 HEADER(STRING_H, "string.h")
 HEADER(UNISTD_H, "unistd.h")
 HEADER(UTILITY, "utility")
+HEADER(TYPE_TRAITS, "type_traits")
 HEADER(WCHAR_H, "wchar.h")
 HEADER(XMMINTRIN_H, "xmmintrin.h")
 
