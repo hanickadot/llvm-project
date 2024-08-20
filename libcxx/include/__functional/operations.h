@@ -16,6 +16,7 @@
 #include <__type_traits/desugars_to.h>
 #include <__type_traits/is_integral.h>
 #include <__utility/forward.h>
+#include <__bit/bit_cast.h>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -360,6 +361,20 @@ struct _LIBCPP_TEMPLATE_VIS less : __binary_function<_Tp, _Tp, bool> {
     return __x < __y;
   }
 };
+
+template <class _Tp>
+struct _LIBCPP_TEMPLATE_VIS less<_Tp *> {
+  _LIBCPP_CONSTEXPR_SINCE_CXX14 _LIBCPP_HIDE_FROM_ABI bool operator()(_Tp * __t, _Tp * __u) const
+      noexcept(true) {
+#if _LIBCPP_STD_VER >= 20
+    return std::bit_cast<uintptr_t>(__t) < std::bit_cast<uintptr_t>(__u);
+#else
+    return reinterpret_cast<uintptr_t>(__t) < reinterpret_cast<uintptr_t>(__u);
+#endif
+  }
+  typedef void is_transparent;
+};
+
 _LIBCPP_CTAD_SUPPORTED_FOR_TYPE(less);
 
 template <class _Tp>
