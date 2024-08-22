@@ -63,6 +63,7 @@
 #include <cstring>
 #include <limits.h>
 #include <stdlib.h>
+#include <__memory/shared_ptr.h>
 
 #ifndef _LIBCXXABI_HAS_NO_THREADS
 #  if defined(__ELF__) && defined(_LIBCXXABI_LINK_PTHREAD_LIB)

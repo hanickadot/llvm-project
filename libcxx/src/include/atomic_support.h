@@ -54,11 +54,6 @@ inline _LIBCPP_HIDE_FROM_ABI void __libcpp_relaxed_store(_ValueType* __dest, _Fr
   __atomic_store_n(__dest, __val, _AO_Relaxed);
 }
 
-template <class _ValueType>
-inline _LIBCPP_HIDE_FROM_ABI _ValueType __libcpp_atomic_load(_ValueType const* __val, int __order = _AO_Seq) {
-  return __atomic_load_n(__val, __order);
-}
-
 template <class _ValueType, class _AddType>
 inline _LIBCPP_HIDE_FROM_ABI _ValueType __libcpp_atomic_add(_ValueType* __val, _AddType __a, int __order = _AO_Seq) {
   return __atomic_add_fetch(__val, __a, __order);
@@ -68,16 +63,6 @@ template <class _ValueType>
 inline _LIBCPP_HIDE_FROM_ABI _ValueType
 __libcpp_atomic_exchange(_ValueType* __target, _ValueType __value, int __order = _AO_Seq) {
   return __atomic_exchange_n(__target, __value, __order);
-}
-
-template <class _ValueType>
-inline _LIBCPP_HIDE_FROM_ABI bool __libcpp_atomic_compare_exchange(
-    _ValueType* __val,
-    _ValueType* __expected,
-    _ValueType __after,
-    int __success_order = _AO_Seq,
-    int __fail_order    = _AO_Seq) {
-  return __atomic_compare_exchange_n(__val, __expected, __after, true, __success_order, __fail_order);
 }
 
 #else // _LIBCPP_HAS_NO_THREADS
@@ -94,11 +79,6 @@ inline _LIBCPP_HIDE_FROM_ABI void __libcpp_relaxed_store(_ValueType* __dest, _Fr
   *__dest = __val;
 }
 
-template <class _ValueType>
-inline _LIBCPP_HIDE_FROM_ABI _ValueType __libcpp_atomic_load(_ValueType const* __val, int = 0) {
-  return *__val;
-}
-
 template <class _ValueType, class _AddType>
 inline _LIBCPP_HIDE_FROM_ABI _ValueType __libcpp_atomic_add(_ValueType* __val, _AddType __a, int = 0) {
   return *__val += __a;
@@ -110,17 +90,6 @@ __libcpp_atomic_exchange(_ValueType* __target, _ValueType __value, int = _AO_Seq
   _ValueType old = *__target;
   *__target      = __value;
   return old;
-}
-
-template <class _ValueType>
-inline _LIBCPP_HIDE_FROM_ABI bool
-__libcpp_atomic_compare_exchange(_ValueType* __val, _ValueType* __expected, _ValueType __after, int = 0, int = 0) {
-  if (*__val == *__expected) {
-    *__val = __after;
-    return true;
-  }
-  *__expected = *__val;
-  return false;
 }
 
 #endif // _LIBCPP_HAS_NO_THREADS
