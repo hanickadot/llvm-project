@@ -21052,6 +21052,19 @@ RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
   llvm::Value * Value = EmitScalarExpr(E->getArg(1));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
   
+
+
+  //llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
+  //llvm::Value * Value = EmitScalarExpr(E->getArg(1));
+  //llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
+  //
+  llvm::Value *Result = Builder.CreateIntrinsic(
+        Intrinsic::ptrmaskadd, {Ptr->getType(), Mask->getType(), Value->getType()},
+        {Ptr, Mask, Value}, nullptr, "result");
+  
+  return RValue::get(Result);
+
+  /*
   llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
   llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
@@ -21062,7 +21075,7 @@ RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
   llvm::Value * ResultInt = Builder.CreateOr(MaskedPtr, MaskedValue, "result_int");
   llvm::Value * Result = Builder.CreateBitOrPointerCast(ResultInt, Ptr->getType(), "result_ptr");
   
-  return RValue::get(Result);
+  return RValue::get(Result);*/
 }
 
 /// Generate (x & ~mask).

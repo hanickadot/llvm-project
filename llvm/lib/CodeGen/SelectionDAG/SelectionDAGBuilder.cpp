@@ -7924,6 +7924,32 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     setValue(&I, DAG.getNode(ISD::AND, sdl, PtrVT, Ptr, Mask));
     return;
   }
+  case Intrinsic::ptrmaskadd: {
+    SDValue Ptr = getValue(I.getOperand(0));
+    SDValue Mask = getValue(I.getOperand(1));
+    SDValue Value = getValue(I.getOperand(2));
+
+    // On arm64_32, pointers are 32 bits when stored in memory, but
+    // zero-extended to 64 bits when in registers.  Thus the mask is 32 bits to
+    // match the index type, but the pointer is 64 bits, so the the mask must be
+    // zero-extended up to 64 bits to match the pointer.
+    EVT PtrVT =
+        TLI.getValueType(DAG.getDataLayout(), I.getOperand(0)->getType());
+    EVT MemVT =
+        TLI.getMemValueType(DAG.getDataLayout(), I.getOperand(0)->getType());
+    assert(PtrVT == Ptr.getValueType());
+    assert(MemVT == Mask.getValueType());
+    if (MemVT != PtrVT)
+      Mask = DAG.getPtrExtOrTrunc(Mask, sdl, MemVT);
+    
+    SDValue NegMask = DAG.getNOT(sdl, Mask, MemVT);
+    SDValue MaskedValue = DAG.getNode(ISD::AND, sdl, MemVT, Value, Mask);
+    SDValue MaskedPtr = DAG.getNode(ISD::AND, sdl, PtrVT, Ptr, NegMask);
+    SDValue PtrWithValue = DAG.getNode(ISD::OR, sdl, PtrVT, MaskedPtr, MaskedValue);
+    
+    setValue(&I, PtrWithValue);
+    return;
+  }
   case Intrinsic::threadlocal_address: {
     setValue(&I, getValue(I.getOperand(0)));
     return;
