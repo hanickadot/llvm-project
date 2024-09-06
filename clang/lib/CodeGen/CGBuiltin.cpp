@@ -21070,13 +21070,10 @@ RValue CodeGenFunction::EmitBuiltinPointerUnTag(const CallExpr *E) {
   llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(1));
   
-  llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
-  
-  llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
-  llvm::Value * NegatedMask = Builder.CreateNot(Mask, "negated_mask");
-  
-  llvm::Value * UnmaskedPtrInt = Builder.CreateAnd(PointerInt, NegatedMask, "result_int");
-  llvm::Value * Result = Builder.CreateBitOrPointerCast(UnmaskedPtrInt, Ptr->getType(), "result_ptr");
+  llvm::Value *InvertedMask = Builder.CreateNot(Mask, "inverted_mask");
+  llvm::Value *Result = Builder.CreateIntrinsic(
+        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
+        {Ptr, InvertedMask}, nullptr, "result");
   
   return RValue::get(Result);
 }
@@ -21088,8 +21085,11 @@ RValue CodeGenFunction::EmitBuiltinPointerTagValue(const CallExpr *E) {
   
   llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
-  llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
-  llvm::Value * Result = Builder.CreateAnd(PointerInt, Mask, "result_int");
+  llvm::Value *PtrResult = Builder.CreateIntrinsic(
+        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
+        {Ptr, Mask}, nullptr, "ptr_result");
+  
+  llvm::Value * Result = Builder.CreateBitOrPointerCast(PtrResult, IntType, "pointer_int");
   
   return RValue::get(Result);
 }
