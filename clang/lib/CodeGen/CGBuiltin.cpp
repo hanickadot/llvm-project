@@ -21052,15 +21052,21 @@ RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
   llvm::Value * Value = EmitScalarExpr(E->getArg(1));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
   
-
-
+  llvm::Value * InvertedMask = Builder.CreateNot(Mask, "inverted_mask");
+  llvm::Value * MaskedPtr = Builder.CreateIntrinsic(
+        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
+        {Ptr, InvertedMask}, nullptr, "result");
+  
+  llvm::Value * MaskedValue = Builder.CreateAnd(Value, Mask, "masked_value");
+  llvm::Value * Result = Builder.CreateAdd(MaskedPtr, MaskedValue);
+  
   //llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
   //llvm::Value * Value = EmitScalarExpr(E->getArg(1));
   //llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
   //
-  llvm::Value *Result = Builder.CreateIntrinsic(
-        Intrinsic::ptrmaskadd, {Ptr->getType(), Mask->getType(), Value->getType()},
-        {Ptr, Mask, Value}, nullptr, "result");
+  //llvm::Value *Result = Builder.CreateIntrinsic(
+  //      Intrinsic::ptrmaskadd, {Ptr->getType(), Mask->getType(), Value->getType()},
+  //      {Ptr, Mask, Value}, nullptr, "result");
   
   return RValue::get(Result);
 

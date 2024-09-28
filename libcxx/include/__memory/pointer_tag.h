@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef _LIBCPP___tag_pointer_H
-#define _LIBCPP___tag_pointer_H
+#ifndef _LIBCPP___TAG_POINTER_H
+#define _LIBCPP___TAG_POINTER_H
 
 #include <__config>
 #include <__type_traits/is_trivially_copyable.h>
