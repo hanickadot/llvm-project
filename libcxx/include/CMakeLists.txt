@@ -231,7 +231,6 @@ set(files
   __bit/endian.h
   __bit/has_single_bit.h
   __bit/invert_if.h
-  __bit/pointer_tag.h
   __bit/popcount.h
   __bit/rotate.h
   __bit_reference
@@ -539,6 +538,7 @@ set(files
   __memory/inout_ptr.h
   __memory/out_ptr.h
   __memory/pointer_traits.h
+  __memory/pointer_tag.h
   __memory/ranges_construct_at.h
   __memory/ranges_uninitialized_algorithms.h
   __memory/raw_storage_iterator.h
