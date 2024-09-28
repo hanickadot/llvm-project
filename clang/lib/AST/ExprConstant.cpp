@@ -14061,6 +14061,12 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
       return Success(CmpResult::Less, E);
     if (CompareLHS > CompareRHS)
       return Success(CmpResult::Greater, E);
+    
+    if (LHSValue.Base.Metadata < RHSValue.Base.Metadata)
+      return Success(CmpResult::Less, E);
+    if (LHSValue.Base.Metadata > RHSValue.Base.Metadata)
+      return Success(CmpResult::Greater, E);
+    
     return Success(CmpResult::Equal, E);
   }
 
