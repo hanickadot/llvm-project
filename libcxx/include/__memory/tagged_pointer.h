@@ -71,17 +71,19 @@ private:
   // hidden constructor from pointer type (usable in conversion, and from-native construction)
   _LIBCPP_ALWAYS_INLINE constexpr tagged_pointer(_native_tagged_pointer_t, pointer_type _pointer) noexcept: _ptr{_pointer} { }
   
+  _LIBCPP_ALWAYS_INLINE static constexpr pointer_type encode_pointer(pointer_type _pointer, tag_type _tag, mask_type _mask) noexcept {
+#if __has_builtin(__builtin_pointer_tag)
+    return static_cast<pointer_type>(__builtin_pointer_tag(_pointer, _tag, _mask));
+#else
+    return reinterpret_cast<pointer_type>((reinterpret_cast<uintptr_t>(_pointer) & ~static_cast<uintptr_t>(_mask)) | (reinterpret_cast<uintptr_t>(_mask) & static_cast<uintptr_t>(_tag)));
+#endif
+  }
+  
 public:
   tagged_pointer() = default;
   
   // create pointer_tag by storing value into ptr
-  _LIBCPP_ALWAYS_INLINE explicit constexpr tagged_pointer(pointer_type _pointer, tag_type _tag = 0u, mask_type _mask = type_alignment_mask<_PointeeT>) noexcept:
-#if __has_builtin(__builtin_pointer_tag)
-    _ptr{static_cast<pointer_type>(__builtin_pointer_tag(_pointer, _tag, _mask))}
-#else
-    _ptr{reinterpret_cast<pointer_type>((reinterpret_cast<uintptr_t>(_pointer) & ~static_cast<uintptr_t>(_mask)) | (reinterpret_cast<uintptr_t>(_mask) & static_cast<uintptr_t>(_tag)))}
-#endif
-  {
+  _LIBCPP_ALWAYS_INLINE explicit constexpr tagged_pointer(pointer_type _pointer, tag_type _tag = 0u, mask_type _mask = type_alignment_mask<_PointeeT>) noexcept: _ptr{encode_pointer(_pointer, _tag, _mask)} {
     _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(this->pointer(_mask) == _pointer, "provided mask must not hide any important pointer bits");
     _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(this->tag(_mask) == _tag, "provided mask must not hide any tag bits");
   }
@@ -128,6 +130,15 @@ public:
 
   template <std::unsigned_integral _Tag = tag_type> _LIBCPP_NODISCARD _LIBCPP_ALWAYS_INLINE constexpr _Tag tag() const noexcept requires (has_static_mask) {
     return tag<_Tag>({});
+  }
+  
+  // modify tag
+  _LIBCPP_NODISCARD _LIBCPP_ALWAYS_INLINE constexpr auto set_tag(mask_type _mask, tag_type _new_tag) noexcept -> tagged_pointer<pointee_type, tag_type, mask_type> {
+    return tagged_pointer<pointee_type, tag_type, mask_type>(pointer(_mask), _new_tag, _mask);
+  }
+  
+  _LIBCPP_NODISCARD _LIBCPP_ALWAYS_INLINE constexpr auto set_tag(tag_type _new_tag) noexcept -> tagged_pointer<pointee_type, tag_type, mask_type> requires (has_static_mask)  {
+    return set_tag({}, _new_tag);
   }
   
   // tuple access support for structured bindings
