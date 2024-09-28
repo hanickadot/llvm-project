@@ -12714,7 +12714,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   }
 
   case Builtin::BI__builtin_is_aligned: {
-    APValue Src;
+   APValue Src;
     APSInt Alignment;
     if (!getBuiltinAlignArguments(E, Info, Src, Alignment))
       return false;

@@ -40,7 +40,7 @@ template <unsigned _Alignment> struct static_alignment_mask_t {
   static_assert(std::has_single_bit(_Alignment) == 1, "Alignment must be power of 2");
   using mask_type = unsigned;
 
-  static constexpr unsigned minimum_alignment = 1024;
+  static constexpr unsigned minimum_alignment = _Alignment;
 
   consteval operator mask_type() const noexcept {
     return _Alignment - 1u;
@@ -104,7 +104,8 @@ public:
   // create pointer_tag by storing value into ptr
   _LIBCPP_ALWAYS_INLINE explicit constexpr tagged_pointer(pointer_type _pointer, tag_type _tag = 0u) noexcept: _ptr{encode_pointer(_pointer, _tag)} {
 #if __has_builtin(__builtin_is_aligned)
-    //_LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(__builtin_is_aligned(_pointer, mask.minimum_alignment), "provided pointer must have minimal alignment defined by mask");
+    [[maybe_unused]] bool is_aligned = __builtin_is_aligned(_pointer, mask.minimum_alignment);
+    _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(is_aligned, "provided pointer must have minimal alignment defined by mask");
 #endif
     _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(this->pointer() == _pointer, "tagged pointer's mask must not hide any important pointer bits");
     _LIBCPP_ASSERT_SEMANTIC_REQUIREMENT(this->tag() == _tag, "tagged pointer's mask must not hide any tag bits");
