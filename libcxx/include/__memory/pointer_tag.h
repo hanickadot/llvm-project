@@ -24,26 +24,28 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 
 #if _LIBCPP_STD_VER >= 26
 
-template <std::unsigned_integral _T> struct pointer_mask {
-  _T value;
+template <std::unsigned_integral _T = unsigned> struct _pointer_bit_mask {
+  _T _value;
+
+  constexpr operator _T() const noexcept {
+    return _value;
+  }
 };
 
-template <unsigned _Alignment> requires (std::has_single_bit(_Alignment)) constexpr unsigned alignment_mask_v = (_Alignment) - 1u;
+template <unsigned _Alignment> requires (std::has_single_bit(_Alignment)) constexpr auto alignment_mask = _pointer_bit_mask{(_Alignment) - 1u};
 
-template <typename _T> constexpr unsigned alignment_mask_of_v = alignment_mask_v<alignof(_T)>;
+template <typename _T> constexpr auto alignment_mask_of = alignment_mask<alignof(_T)>;
 
-template <std::unsigned_integral T = uintptr_t> constexpr T all_bits_mask_v = ~static_cast<T>(0u); 
-
-template <typename _PointerT, std::unsigned_integral auto _Mask = alignment_mask_of_v<_PointerT>, std::unsigned_integral _TagT = unsigned> class pointer_tag_pair {
+template <typename _PointeeT, std::unsigned_integral auto _Mask = alignment_mask_of<_PointeeT>._value, std::unsigned_integral _TagT = unsigned> class pointer_tag_pair {
 public:
-  using pointee_type = _PointerT;
+  using pointee_type = _PointeeT;
   using pointer_type = pointee_type *;
   using tag_type = _TagT;
   using mask_type = decltype(_Mask);
   
   static constexpr mask_type mask = _Mask;
 private:
-  static constexpr bool is_custom = (mask == all_bits_mask_v<mask_type>);
+  static constexpr bool is_custom = false;
   
   pointer_type _ptr;
   
@@ -92,22 +94,22 @@ public:
 };
 
 // "casting" into pointer_tag_pair
-template <std::unsigned_integral auto _Mask, typename _PointerT> constexpr auto tag_pointer(_PointerT * _ptr, std::unsigned_integral auto _tag = 0u) noexcept {
-  return pointer_tag_pair<_PointerT, _Mask, decltype(_tag)>(_ptr, _tag);
+template <std::unsigned_integral auto _Mask, typename _PointeeT> constexpr auto tag_pointer(_PointeeT * _ptr, std::unsigned_integral auto _tag = 0u) noexcept {
+  return pointer_tag_pair<_PointeeT, _Mask, decltype(_tag)>(_ptr, _tag);
 }
 
-template <typename _PointerT, std::unsigned_integral auto _Mask = alignment_mask_of_v<_PointerT>, std::unsigned_integral _TagT = unsigned> constexpr auto tag_pointer(_PointerT * _ptr, _TagT _tag = 0u) noexcept {
-  return pointer_tag_pair<_PointerT, _Mask, _TagT>(_ptr, _tag);
+template <typename _PointeeT, std::unsigned_integral auto _Mask = alignment_mask_of<_PointeeT>._value, std::unsigned_integral _TagT = unsigned> constexpr auto tag_pointer(_PointeeT * _ptr, _TagT _tag = 0u) noexcept {
+  return pointer_tag_pair<_PointeeT, _Mask, _TagT>(_ptr, _tag);
 }
 
 // tuple protocol support
-template <typename _PointerT, std::unsigned_integral auto _Mask, std::unsigned_integral _TagT>
-struct tuple_size<pointer_tag_pair<_PointerT, _Mask, _TagT>>: std::integral_constant<std::size_t, 2> {};
+template <typename _PointeeT, std::unsigned_integral auto _Mask, std::unsigned_integral _TagT>
+struct tuple_size<pointer_tag_pair<_PointeeT, _Mask, _TagT>>: std::integral_constant<std::size_t, 2> {};
 
-template <std::size_t I, typename _PointerT, std::unsigned_integral auto _Mask, std::unsigned_integral _TagT>
+template <std::size_t I, typename _PointeeT, std::unsigned_integral auto _Mask, std::unsigned_integral _TagT>
 struct tuple_element<
-    I, pointer_tag_pair<_PointerT, _Mask, _TagT>> {
-  using _pair_type = pointer_tag_pair<_PointerT, _Mask, _TagT>;
+    I, pointer_tag_pair<_PointeeT, _Mask, _TagT>> {
+  using _pair_type = pointer_tag_pair<_PointeeT, _Mask, _TagT>;
   using type = std::conditional_t<I == 0, typename _pair_type::pointer_type, typename _pair_type::tag_type>;
 };
 
