@@ -21052,36 +21052,26 @@ RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
   llvm::Value * Value = EmitScalarExpr(E->getArg(1));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
   
-  llvm::Value * InvertedMask = Builder.CreateNot(Mask, "inverted_mask");
-  llvm::Value * MaskedPtr = Builder.CreateIntrinsic(
-        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
-        {Ptr, InvertedMask}, nullptr, "result");
-  
-  llvm::Value * MaskedValue = Builder.CreateAnd(Value, Mask, "masked_value");
-  llvm::Value * Result = Builder.CreateAdd(MaskedPtr, MaskedValue);
-  
-  //llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
-  //llvm::Value * Value = EmitScalarExpr(E->getArg(1));
-  //llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
-  //
-  //llvm::Value *Result = Builder.CreateIntrinsic(
-  //      Intrinsic::ptrmaskadd, {Ptr->getType(), Mask->getType(), Value->getType()},
-  //      {Ptr, Mask, Value}, nullptr, "result");
-  
-  return RValue::get(Result);
-
-  /*
   llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
+  // for now I'm going path of bitcast
   llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
-  llvm::Value * NegatedMask = Builder.CreateNot(Mask, "negated_mask");
-  llvm::Value * MaskedPtr = Builder.CreateAnd(PointerInt, NegatedMask, "masked_ptr");
+  llvm::Value * InvertedMask = Builder.CreateNot(Mask, "inverted_mask");
+  
+  llvm::Value * MaskedPtr = Builder.CreateAnd(PointerInt, InvertedMask, "masked_ptr");
+  //llvm::Value * MaskedPtr = Builder.CreateIntrinsic(
+  //      Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
+  //      {Ptr, InvertedMask}, nullptr, "result");
+  
   llvm::Value * MaskedValue = Builder.CreateAnd(Value, Mask, "masked_value");
   
   llvm::Value * ResultInt = Builder.CreateOr(MaskedPtr, MaskedValue, "result_int");
   llvm::Value * Result = Builder.CreateBitOrPointerCast(ResultInt, Ptr->getType(), "result_ptr");
   
-  return RValue::get(Result);*/
+  
+  //llvm::Value * Result = Builder.CreateAdd(MaskedPtr, MaskedValue);
+  
+  return RValue::get(Result);
 }
 
 /// Generate (x & ~mask).
