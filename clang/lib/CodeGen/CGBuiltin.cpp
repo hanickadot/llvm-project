@@ -5254,12 +5254,16 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
 
     return RValue::get(Carry);
   }
-  case Builtin::BI__builtin_pointer_tag:
-    return EmitBuiltinPointerTag(E);
-  case Builtin::BI__builtin_pointer_untag:
-    return EmitBuiltinPointerUnTag(E);
-  case Builtin::BI__builtin_pointer_tag_value:
-    return EmitBuiltinPointerTagValue(E);
+  case Builtin::BI__builtin_tag_pointer_mask_or:
+    return EmitBuiltinTagPointerMaskOr(E);
+  case Builtin::BI__builtin_tag_pointer_mask:
+    return EmitBuiltinTagPointerMask(E);
+  case Builtin::BI__builtin_tag_pointer_mask_as_int:
+    return EmitBuiltinTagPointerMaskAsInt(E);
+  case Builtin::BI__builtin_tag_pointer_shift_or:
+    return EmitBuiltinTagPointerShiftOr(E);
+  case Builtin::BI__builtin_tag_pointer_unshift:
+    return EmitBuiltinTagPointerUnshift(E);
   case Builtin::BIaddressof:
   case Builtin::BI__addressof:
   case Builtin::BI__builtin_addressof:
@@ -21047,7 +21051,7 @@ struct BuiltinPointerTagArgs {
 }
 
 /// Generate (x & ~mask) | (value & mask).
-RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
+RValue CodeGenFunction::EmitBuiltinTagPointerMaskOr(const CallExpr *E) {
   llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
   llvm::Value * Value = EmitScalarExpr(E->getArg(1));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(2));
@@ -21074,34 +21078,72 @@ RValue CodeGenFunction::EmitBuiltinPointerTag(const CallExpr *E) {
   return RValue::get(Result);
 }
 
-/// Generate (x & ~mask).
-RValue CodeGenFunction::EmitBuiltinPointerUnTag(const CallExpr *E) {
+/// Generate (x << shift) | (value & ((1 << shift) - 1)).
+RValue CodeGenFunction::EmitBuiltinTagPointerShiftOr(const CallExpr *E) {
   llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
-  llvm::Value * Mask = EmitScalarExpr(E->getArg(1));
+  llvm::Value * Value = EmitScalarExpr(E->getArg(1));
+  llvm::Value * Shift = EmitScalarExpr(E->getArg(2));
   
-  llvm::Value *InvertedMask = Builder.CreateNot(Mask, "inverted_mask");
-  llvm::Value *Result = Builder.CreateIntrinsic(
-        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
-        {Ptr, InvertedMask}, nullptr, "result");
+  llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
+  // for now I'm going path of bitcast
+  llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
+  llvm::Value * ShiftedPointerInt = Builder.CreateShl(PointerInt, Shift);
+  
+  auto *One = llvm::ConstantInt::get(IntType, 1);
+  
+  llvm::Value * Mask = Builder.CreateSub(Builder.CreateShl(One, Shift), One, "mask");
+  llvm::Value * MaskedValue = Builder.CreateAdd(Value, Mask, "masked_value");
+  llvm::Value * PointerWithTag = Builder.CreateOr(ShiftedPointerInt, MaskedValue, "pointer_with_tag_int");
+  
+  llvm::Value * Result = Builder.CreateBitOrPointerCast(PointerWithTag, Ptr->getType(), "result_ptr");
+  return RValue::get(Result);
+}
+
+/// Generate (x >> shift)
+RValue CodeGenFunction::EmitBuiltinTagPointerUnshift(const CallExpr *E) {
+  llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
+  llvm::Value * Shift = EmitScalarExpr(E->getArg(2));
+  
+  llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
+  
+  // for now I'm going path of bitcast
+  llvm::Value * PointerInt = Builder.CreateBitOrPointerCast(Ptr, IntType, "pointer_int");
+  llvm::Value * UnShiftedPointerInt = Builder.CreateAShr(PointerInt, Shift, "unshifted_pointer_int");
+  
+  llvm::Value * Result = Builder.CreateBitOrPointerCast(UnShiftedPointerInt, Ptr->getType(), "result_ptr");
   return RValue::get(Result);
 }
 
 /// Generate (x & mask).
-RValue CodeGenFunction::EmitBuiltinPointerTagValue(const CallExpr *E) {
+RValue CodeGenFunction::EmitBuiltinTagPointerMask(const CallExpr *E) {
+  llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
+  llvm::Value * Mask = EmitScalarExpr(E->getArg(1));
+  
+  llvm::Value *Result = Builder.CreateIntrinsic(
+        Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
+        {Ptr, Mask}, nullptr, "result");
+  
+  return RValue::get(Result);
+}
+
+/// Generate (x & mask) (but return it as number).
+RValue CodeGenFunction::EmitBuiltinTagPointerMaskAsInt(const CallExpr *E) {
   llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
   llvm::Value * Mask = EmitScalarExpr(E->getArg(1));
   
   llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
-  llvm::Value *PtrResult = Builder.CreateIntrinsic(
+  llvm::Value *Result = Builder.CreateIntrinsic(
         Intrinsic::ptrmask, {Ptr->getType(), Mask->getType()},
-        {Ptr, Mask}, nullptr, "ptr_result");
+        {Ptr, Mask}, nullptr, "result");
+
+  llvm::Value * IntResult = Builder.CreateBitOrPointerCast(Result, IntType, "int_result");
   
-  llvm::Value * Result = Builder.CreateBitOrPointerCast(PtrResult, IntType, "pointer_int");
-  
-  return RValue::get(Result);
+  return RValue::get(IntResult);
 }
+
+
 
 namespace {
 struct BuiltinAlignArgs {

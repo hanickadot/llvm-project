@@ -4775,22 +4775,39 @@ def ArithmeticFence : LangBuiltin<"ALL_LANGUAGES"> {
   let Prototype = "void(...)";
 }
 
-def PointerTag : Builtin {
-  let Spellings = ["__builtin_pointer_tag"];
+// (ptr & mask) | (val & ~mask)
+def TagPointerMaskOr : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask_or"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void*(void*, size_t, size_t)";
 }
 
-def PointerUntag : Builtin {
-  let Spellings = ["__builtin_pointer_untag"];
+// (ptr & mask)
+def TagPointerMask : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void*(void*, size_t)";
 }
 
-def PointerTagValue : Builtin {
-  let Spellings = ["__builtin_pointer_tag_value"];
+// (uintptr_t)(ptr & mask)
+def TagPointerMaskAsInt : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask_as_int"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "size_t(void*, size_t)";
+}
+
+// (ptr << shift) | (value)
+def TagPointerShiftOr : Builtin {
+  let Spellings = ["__builtin_tag_pointer_shift_or"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t, size_t)";
+}
+
+// (ptr >> unshift)
+def TagPointerUnshift : Builtin {
+  let Spellings = ["__builtin_tag_pointer_unshift"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t)";
 }
 
 def IsWithinLifeTime : Builtin {
@@ -4803,4 +4820,10 @@ def ConstexprPrint : Builtin {
   let Spellings = ["__constexpr_print"];
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void(char const*)";
+}
+
+def FreezeAllocation : Builtin {
+  let Spellings = ["__builtin_freeze_allocation"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void *(void *)";
 }

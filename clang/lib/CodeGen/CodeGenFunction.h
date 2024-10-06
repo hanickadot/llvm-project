@@ -4549,14 +4549,12 @@ public:
   /// Emit IR for __builtin_os_log_format.
   RValue emitBuiltinOSLogFormat(const CallExpr &E);
 
-  /// Emit IR for __builtin_pointer_tag.
-  RValue EmitBuiltinPointerTag(const CallExpr *E);
-  
-  /// Emit IR for __builtin_pointer_untag.
-  RValue EmitBuiltinPointerUnTag(const CallExpr *E);
-  
-  /// Emit IR for __builtin_pointer_tag_value.
-  RValue EmitBuiltinPointerTagValue(const CallExpr *E);
+  /// Emit IR for pointer tagging
+  RValue EmitBuiltinTagPointerMaskOr(const CallExpr *E);
+  RValue EmitBuiltinTagPointerMask(const CallExpr *E);
+  RValue EmitBuiltinTagPointerMaskAsInt(const CallExpr *E);
+  RValue EmitBuiltinTagPointerShiftOr(const CallExpr *E);
+  RValue EmitBuiltinTagPointerUnshift(const CallExpr *E);
 
   /// Emit IR for __builtin_is_aligned.
   RValue EmitBuiltinIsAligned(const CallExpr *E);

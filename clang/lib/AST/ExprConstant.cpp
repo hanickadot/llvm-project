@@ -9735,7 +9735,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BI__addressof:
   case Builtin::BI__builtin_addressof:
     return evaluateLValue(E->getArg(0), Result);
-  case Builtin::BI__builtin_pointer_tag: {
+  case Builtin::BI__builtin_tag_pointer_mask_or: {
     APSInt Value, Mask;
     if (!evaluatePointer(E->getArg(0), Result))
       return Error(E);
@@ -9749,9 +9749,28 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     Result.Base.Metadata = (Result.Base.Metadata & ~Mask.getLimitedValue()) | (Value.getLimitedValue() & Mask.getLimitedValue());
     return true;
   }
+  
+  case Builtin::BI__builtin_tag_pointer_shift_or: {
+    APSInt Value, Shift;
+    if (!evaluatePointer(E->getArg(0), Result))
+      return Error(E);
     
-  case Builtin::BI__builtin_pointer_untag: {
-    // TODO implement me
+    if (!EvaluateInteger(E->getArg(1), Value, Info))
+      return Error(E);
+    
+    if (!EvaluateInteger(E->getArg(2), Shift, Info))
+      return Error(E);
+    
+    // TODO error message
+    if (Shift.getLimitedValue() == 0)
+      return Error(E);
+    
+    const uint64_t Mask = (1ull << static_cast<uint64_t>(Shift.getLimitedValue())) - 1ull;
+    Result.Base.Metadata = (Result.Base.Metadata << static_cast<uint64_t>(Shift.getLimitedValue())) | (Value.getLimitedValue() & Mask);
+    return true;
+  }
+    
+  case Builtin::BI__builtin_tag_pointer_mask: {
     APSInt Mask;
     if (!evaluatePointer(E->getArg(0), Result))
         return Error(E);
@@ -9759,9 +9778,22 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (!EvaluateInteger(E->getArg(1), Mask, Info))
       return Error(E);
     
-    Result.Base.Metadata = (Result.Base.Metadata & ~Mask.getLimitedValue());
+    Result.Base.Metadata = (Result.Base.Metadata & Mask.getLimitedValue());
     return true;
   }
+  
+  case Builtin::BI__builtin_tag_pointer_unshift: {
+    APSInt Shift;
+    if (!evaluatePointer(E->getArg(0), Result))
+        return Error(E);
+    
+    if (!EvaluateInteger(E->getArg(1), Shift, Info))
+      return Error(E);
+    
+    Result.Base.Metadata = (Result.Base.Metadata >> static_cast<uint64_t>(Shift.getLimitedValue()));
+    return true;
+  }
+  
   case Builtin::BI__builtin_assume_aligned: {
     // We need to be very careful here because: if the pointer does not have the
     // asserted alignment, then the behavior is undefined, and undefined
@@ -12650,7 +12682,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   default:
     return false;
 
-  case Builtin::BI__builtin_pointer_tag_value: {
+  case Builtin::BI__builtin_tag_pointer_mask_as_int: {
     LValue Pointer;
     APSInt Mask;
     
@@ -12659,8 +12691,10 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   
     if (!EvaluateInteger(E->getArg(1), Mask, Info))
       return Error(E);
+    
+    const uint64_t Result = Pointer.Base.Metadata & (static_cast<uint64_t>(Mask.getLimitedValue()));
   
-    return Success(Pointer.Base.Metadata & Mask.getLimitedValue(), E);
+    return Success(Result, E);
   }
   case Builtin::BI__builtin_is_within_lifetime: {
     
