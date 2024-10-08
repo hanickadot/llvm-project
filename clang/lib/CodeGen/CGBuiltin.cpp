@@ -21103,7 +21103,7 @@ RValue CodeGenFunction::EmitBuiltinTagPointerShiftOr(const CallExpr *E) {
 /// Generate (x >> shift)
 RValue CodeGenFunction::EmitBuiltinTagPointerUnshift(const CallExpr *E) {
   llvm::Value * Ptr = EmitScalarExpr(E->getArg(0));
-  llvm::Value * Shift = EmitScalarExpr(E->getArg(2));
+  llvm::Value * Shift = EmitScalarExpr(E->getArg(1));
   
   llvm::IntegerType * IntType = IntegerType::get(getLLVMContext(), CGM.getDataLayout().getIndexTypeSizeInBits(Ptr->getType()));
   
