@@ -4335,6 +4335,20 @@ inline constexpr bool __format::__enable_insertable<std::basic_string<wchar_t>> 
 #endif
 
 _LIBCPP_END_NAMESPACE_STD
+  
+namespace std {
+
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION logic_error::logic_error(const string& msg) : logic_error(msg.c_str()) {}
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION runtime_error::runtime_error(const string& msg) : runtime_error(msg.c_str()) {}
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI domain_error::domain_error(const string& __s) : logic_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI invalid_argument::invalid_argument(const string& __s) : logic_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI length_error::length_error(const string& __s) : logic_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI out_of_range::out_of_range(const string& __s) : logic_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI range_error::range_error(const string& __s) : runtime_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI overflow_error::overflow_error(const string& __s) : runtime_error{__s} { }
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI underflow_error::underflow_error(const string& __s) : runtime_error{__s} { }
+
+}
 
 _LIBCPP_POP_MACROS
 

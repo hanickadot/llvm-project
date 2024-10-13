@@ -44,7 +44,9 @@ public:
 #include <__config>
 #include <__exception/exception.h>
 #include <__fwd/string.h>
+#include <__type_traits/is_constant_evaluated.h>
 #include <__verbose_abort>
+#include <new>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -53,7 +55,7 @@ public:
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
-class _LIBCPP_HIDDEN __libcpp_refstring {
+class __libcpp_refstring {
   const char* __imp_;
 
   bool __uses_refcount() const;
@@ -66,6 +68,15 @@ public:
 
   _LIBCPP_HIDE_FROM_ABI const char* c_str() const _NOEXCEPT { return __imp_; }
 };
+
+inline __libcpp_refstring & __convert_to_refstring(const char *& ptr) {
+  return *static_cast<__libcpp_refstring *>(static_cast<void *>(&ptr));
+}
+
+inline const __libcpp_refstring & __convert_to_refstring(const char * const& ptr) {
+  return *static_cast<const __libcpp_refstring *>(static_cast<const void *>(&ptr));
+}
+
 #endif // !_LIBCPP_ABI_VCRUNTIME
 
 _LIBCPP_END_NAMESPACE_STD
@@ -73,22 +84,60 @@ _LIBCPP_END_NAMESPACE_STD
 namespace std // purposefully not using versioning namespace
 {
 
+_LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION const char * __libcpp_copy_c_string(const char * __str) {
+  const unsigned __len = __builtin_strlen(__str);
+  char * __buffer = new char[__len+1];
+  __builtin_memcpy(__buffer, __str, __len+1);
+  return __buffer;
+}
+
 class _LIBCPP_EXPORTED_FROM_ABI logic_error : public exception {
 #ifndef _LIBCPP_ABI_VCRUNTIME
 
 private:
-  std::__libcpp_refstring __imp_;
+  const char * __imp_;
 
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION explicit logic_error(const string&);
-  _LIBCPP_CONSTEXPR_EXCEPTION explicit logic_error(const char*);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION explicit logic_error(const string&);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION explicit logic_error(const char* __msg) {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__msg);
+    } else {
+      new (&__convert_to_refstring(__imp_)) __libcpp_refstring(__msg);
+    }
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION logic_error(const logic_error&) _NOEXCEPT;
-  _LIBCPP_CONSTEXPR_EXCEPTION logic_error& operator=(const logic_error&) _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION logic_error(const logic_error& __le) _NOEXCEPT {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__le.__imp_);
+    } else {
+      new (&__convert_to_refstring(__imp_)) __libcpp_refstring(__convert_to_refstring(__le.__imp_));
+    }
+  }
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION logic_error& operator=(const logic_error& __le) _NOEXCEPT {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__le.__imp_);
+    } else {
+      __convert_to_refstring(__imp_) = __convert_to_refstring(__le.__imp_);
+    }
+    return *this;
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION ~logic_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~logic_error() _NOEXCEPT override {
+    if (__libcpp_is_constant_evaluated()) {
+      delete[] __imp_;
+    } else {
+       __convert_to_refstring(__imp_).~__libcpp_refstring();
+    }  
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION const char* what() const _NOEXCEPT override {
+    if (__libcpp_is_constant_evaluated()) {
+      return __imp_;
+    } else {
+      return __convert_to_refstring(__imp_).c_str();
+    }
+  }
 #else
 
 public:
@@ -101,18 +150,49 @@ class _LIBCPP_EXPORTED_FROM_ABI runtime_error : public exception {
 #ifndef _LIBCPP_ABI_VCRUNTIME
 
 private:
-  std::__libcpp_refstring __imp_;
+  const char * __imp_;
 
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION explicit runtime_error(const string&);
-  _LIBCPP_CONSTEXPR_EXCEPTION explicit runtime_error(const char*);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION explicit runtime_error(const string&);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION explicit runtime_error(const char* __msg) {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__msg);
+    } else {
+      new (&__convert_to_refstring(__imp_)) __libcpp_refstring(__msg);
+    }
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION runtime_error(const runtime_error&) _NOEXCEPT;
-  _LIBCPP_CONSTEXPR_EXCEPTION runtime_error& operator=(const runtime_error&) _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION runtime_error(const runtime_error& __re) _NOEXCEPT {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__re.__imp_);
+    } else {
+      new (&__convert_to_refstring(__imp_)) __libcpp_refstring(__convert_to_refstring(__re.__imp_));
+    }
+  }
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION runtime_error& operator=(const runtime_error& __re) _NOEXCEPT {
+    if (__libcpp_is_constant_evaluated()) {
+      __imp_ = __libcpp_copy_c_string(__re.__imp_);
+    } else {
+      __convert_to_refstring(__imp_) = __convert_to_refstring(__re.__imp_);
+    }
+    return *this;
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION ~runtime_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~runtime_error() _NOEXCEPT override {
+    if (__libcpp_is_constant_evaluated()) {
+      delete[] __imp_;
+    } else {
+       __convert_to_refstring(__imp_).~__libcpp_refstring();
+    }  
+  }
 
-  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION const char* what() const _NOEXCEPT override {
+    if (__libcpp_is_constant_evaluated()) {
+      return __imp_;
+    } else {
+      return __convert_to_refstring(__imp_).c_str();
+    }
+  }
 #else
 
 public:
@@ -123,84 +203,84 @@ public:
 
 class _LIBCPP_EXPORTED_FROM_ABI domain_error : public logic_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit domain_error(const string& __s) : logic_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit domain_error(const char* __s) : logic_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit domain_error(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit domain_error(const char* __s) : logic_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI domain_error(const domain_error&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI domain_error& operator=(const domain_error&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~domain_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~domain_error() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI invalid_argument : public logic_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit invalid_argument(const string& __s) : logic_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit invalid_argument(const char* __s) : logic_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit invalid_argument(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit invalid_argument(const char* __s) : logic_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI invalid_argument(const invalid_argument&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI invalid_argument& operator=(const invalid_argument&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~invalid_argument() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~invalid_argument() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI length_error : public logic_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit length_error(const string& __s) : logic_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit length_error(const char* __s) : logic_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit length_error(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit length_error(const char* __s) : logic_error(__s) {}
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI length_error(const length_error&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI length_error& operator=(const length_error&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~length_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~length_error() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI out_of_range : public logic_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit out_of_range(const string& __s) : logic_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit out_of_range(const char* __s) : logic_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit out_of_range(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit out_of_range(const char* __s) : logic_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI out_of_range(const out_of_range&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI out_of_range& operator=(const out_of_range&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~out_of_range() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~out_of_range() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI range_error : public runtime_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit range_error(const string& __s) : runtime_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit range_error(const char* __s) : runtime_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit range_error(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit range_error(const char* __s) : runtime_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI range_error(const range_error&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI range_error& operator=(const range_error&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~range_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~range_error() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI overflow_error : public runtime_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit overflow_error(const string& __s) : runtime_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit overflow_error(const char* __s) : runtime_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit overflow_error(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit overflow_error(const char* __s) : runtime_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI overflow_error(const overflow_error&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI overflow_error& operator=(const overflow_error&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~overflow_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~overflow_error() _NOEXCEPT override { }
 #endif
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI underflow_error : public runtime_error {
 public:
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit underflow_error(const string& __s) : runtime_error(__s) {}
-  _LIBCPP_CONSTEXPR_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit underflow_error(const char* __s) : runtime_error(__s) {}
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit underflow_error(const string& __s);
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION _LIBCPP_HIDE_FROM_ABI explicit underflow_error(const char* __s) : runtime_error(__s) {}
 
 #ifndef _LIBCPP_ABI_VCRUNTIME
   _LIBCPP_HIDE_FROM_ABI underflow_error(const underflow_error&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI underflow_error& operator=(const underflow_error&) _NOEXCEPT = default;
-  _LIBCPP_CONSTEXPR_EXCEPTION ~underflow_error() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~underflow_error() _NOEXCEPT override { }
 #endif
 };
 

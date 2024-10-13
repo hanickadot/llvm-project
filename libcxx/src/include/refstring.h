@@ -75,7 +75,7 @@ inline const char* get_gcc_empty_string_storage() noexcept {
 
 using namespace __refstring_imp;
 
-inline __libcpp_refstring::__libcpp_refstring(const char* msg) {
+__libcpp_refstring::__libcpp_refstring(const char* msg) {
   std::size_t len = strlen(msg);
   _Rep_base* rep  = static_cast<_Rep_base*>(::operator new(sizeof(*rep) + len + 1));
   rep->len        = len;
@@ -86,12 +86,12 @@ inline __libcpp_refstring::__libcpp_refstring(const char* msg) {
   __imp_ = data;
 }
 
-inline __libcpp_refstring::__libcpp_refstring(const __libcpp_refstring& s) noexcept : __imp_(s.__imp_) {
+__libcpp_refstring::__libcpp_refstring(const __libcpp_refstring& s) noexcept : __imp_(s.__imp_) {
   if (__uses_refcount())
     __libcpp_atomic_add(&rep_from_data(__imp_)->count, 1);
 }
 
-inline __libcpp_refstring& __libcpp_refstring::operator=(__libcpp_refstring const& s) noexcept {
+__libcpp_refstring& __libcpp_refstring::operator=(__libcpp_refstring const& s) noexcept {
   bool adjust_old_count     = __uses_refcount();
   struct _Rep_base* old_rep = rep_from_data(__imp_);
   __imp_                    = s.__imp_;
@@ -105,7 +105,7 @@ inline __libcpp_refstring& __libcpp_refstring::operator=(__libcpp_refstring cons
   return *this;
 }
 
-inline __libcpp_refstring::~__libcpp_refstring() {
+__libcpp_refstring::~__libcpp_refstring() {
   if (__uses_refcount()) {
     _Rep_base* rep = rep_from_data(__imp_);
     if (__libcpp_atomic_add(&rep->count, count_t(-1)) < 0) {
@@ -114,7 +114,7 @@ inline __libcpp_refstring::~__libcpp_refstring() {
   }
 }
 
-inline bool __libcpp_refstring::__uses_refcount() const {
+bool __libcpp_refstring::__uses_refcount() const {
 #if defined(_LIBCPP_CHECK_FOR_GCC_EMPTY_STRING_STORAGE)
   return __imp_ != get_gcc_empty_string_storage();
 #else
