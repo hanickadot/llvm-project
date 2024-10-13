@@ -401,6 +401,10 @@ def note_constexpr_unhandled_exception : Note<
   "unhandled exception of type %0 thrown from here">;
 def note_constexpr_no_active_exception : Note<
   "there is no active exception to rethrow">;
+def err_constexpr_destructor_throwing_an_exception_while_unrolling : Error<
+  "exception thrown out of an object destructor while unrolling another exception">;
+def note_constexpr_exception_thrown_here : Note<
+  "exception thrown here">;
 def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
   "throwing exception is not allowed prior C++26">;
 def err_constexpr_assertion_failure : Error<

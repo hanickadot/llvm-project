@@ -733,6 +733,7 @@ namespace {
           Loc = VD->getLocation();
         else if (const Expr *E = Base.dyn_cast<const Expr*>())
           Loc = E->getExprLoc();
+        
         return HandleDestruction(Info, Loc, Base, *Value.getPointer(), T);
       }
       *Value.getPointer() = APValue();
@@ -1047,12 +1048,12 @@ namespace {
       EvaluatingDeclValue = &Value;
     }
     
-    bool CurrentlyUnrollingException() const {
-      return !this->UncaughtExceptions.empty();
+    bool CurrentlyUnrollingException() {
+      return !this->UncaughtExceptions.empty() && !this->hasActiveDiagnostic();
     }
     
     bool CheckUnhandledExceptions() {
-      if (CurrentlyUnrollingException()) {
+      if (!this->UncaughtExceptions.empty()) {
         //std::cout << "CheckUnhandledExceptions: " << this->UncaughtExceptions.size() << " exception(s)\n";
         while (!this->UncaughtExceptions.empty()) {
           auto & TopException = this->UncaughtExceptions.top();
@@ -5714,20 +5715,18 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       }
       
       if (result == ESR_Failed && !Info.UncaughtExceptions.empty()) {
-        //std::cout << "trying to handle...\n"; 
-        // FIXME make the exception active
-        Info.ActiveExceptions.emplace(std::move(Info.UncaughtExceptions.top()));
-        Info.UncaughtExceptions.pop();
-        auto & TopException = Info.ActiveExceptions.top();
-        
         for (const Stmt * catchHandler: tryStatement->handlers()) {
-          //std::cout << " * ";
           const CXXCatchStmt * Catch = cast<CXXCatchStmt>(catchHandler);
         
           // skip incompatible handles...
-          if (!TopException.expression->isCompatibleHandler(Catch, Info.getLangOpts())) {
+          if (!Info.UncaughtExceptions.top().expression->isCompatibleHandler(Catch, Info.getLangOpts())) {
             continue;
           }
+          
+          // we now know it's compatible so we can make it active...
+          Info.ActiveExceptions.emplace(std::move(Info.UncaughtExceptions.top()));
+          Info.UncaughtExceptions.pop();
+          auto & TopException = Info.ActiveExceptions.top();
           
           FullExpressionRAII CatchScope(Info);
         
@@ -5741,7 +5740,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           
             QualType T = exceptionVariableDecl->getType();
 
-            // TODO handle conversions
+            // TODO handle conversions and copies properly
             if (T->isReferenceType()) {
               Val = TopException.pointer;
             } else {
@@ -5780,6 +5779,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           }
           
           // destroy scope
+          // TODO: make sure any destructor won't throw when unrolling
           if (!CatchScope.destroy()) {
             return ESR_Failed;
           }
@@ -5788,10 +5788,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
           return EvalResult;
         }
         
-        // rethrow exception further
-        // TODO store rethrow location
-        Info.UncaughtExceptions.emplace(std::move(Info.ActiveExceptions.top()));
-        Info.ActiveExceptions.pop();
+        // this is like rethrow ... as exception is still uncaught
         return ESR_Failed;
       }
       return result;
@@ -6969,10 +6966,23 @@ static bool HandleDestruction(EvalInfo &Info, SourceLocation Loc,
   // (such as the object we're about to destroy) being correct.
   if (Info.EvalStatus.HasSideEffects)
     return false;
-
+  
+  const auto * TopException = Info.CurrentlyUnrollingException() ? &Info.UncaughtExceptions.top() : nullptr;
+  
   LValue LV;
   LV.set({LVBase});
-  return HandleDestructionImpl(Info, Loc, LV, Value, T);
+  bool Success = HandleDestructionImpl(Info, Loc, LV, Value, T);
+  
+  const auto * TopExceptionAfterDestructor = Info.CurrentlyUnrollingException() ? &Info.UncaughtExceptions.top() : nullptr;
+  
+  // If we were unrolling an exception, we can't throw another one!
+  // TODO: find spec
+  if (!Success && TopException && TopExceptionAfterDestructor && TopException != TopExceptionAfterDestructor) {
+    Info.CCEDiag(Loc, diag::err_constexpr_destructor_throwing_an_exception_while_unrolling, 1);
+    return false;
+  }
+  
+  return Success;
 }
 
 /// Perform a call to 'operator new' or to `__builtin_operator_new'.
@@ -10184,7 +10194,7 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
                              ArrayBound.getZExtValue(), /*Diag=*/!IsNothrow)) {
       if (IsNothrow)
         return ZeroInitialization(E);
-      return false;
+      return false; // TODO throw an exception here
     }
 
     //   -- the new-initializer is a braced-init-list and the number of
