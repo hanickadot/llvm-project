@@ -8,10 +8,6 @@
 
 #include <any>
 
-namespace std {
-const char* bad_any_cast::what() const noexcept { return "bad any cast"; }
-} // namespace std
-
 #include <experimental/__config>
 
 //  Preserve std::experimental::any_bad_cast for ABI compatibility

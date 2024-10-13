@@ -9,14 +9,6 @@
 #include <optional>
 #include <stdexcept>
 
-namespace std {
-
-bad_optional_access::~bad_optional_access() noexcept = default;
-
-const char* bad_optional_access::what() const noexcept { return "bad_optional_access"; }
-
-} // namespace std
-
 #include <experimental/__config>
 
 //  Preserve std::experimental::bad_optional_access for ABI compatibility

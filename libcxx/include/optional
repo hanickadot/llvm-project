@@ -245,8 +245,8 @@ public:
   _LIBCPP_HIDE_FROM_ABI bad_optional_access(const bad_optional_access&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI bad_optional_access& operator=(const bad_optional_access&) _NOEXCEPT = default;
   // Get the key function ~bad_optional_access() into the dylib
-  ~bad_optional_access() _NOEXCEPT override;
-  const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION ~bad_optional_access() _NOEXCEPT override { }
+  _LIBCPP_CONSTEXPR_OR_INLINE_EXCEPTION const char* what() const _NOEXCEPT override { return "std::bad_optional_access"; }
 };
 
 } // namespace std
