@@ -126,21 +126,31 @@ extern _LIBCPP_EXPORTED_FROM_ABI const nothrow_t nothrow;
 
 class _LIBCPP_EXPORTED_FROM_ABI bad_alloc : public exception {
 public:
-  bad_alloc() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_EXCEPTION bad_alloc() _NOEXCEPT;
   _LIBCPP_HIDE_FROM_ABI bad_alloc(const bad_alloc&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI bad_alloc& operator=(const bad_alloc&) _NOEXCEPT = default;
-  ~bad_alloc() _NOEXCEPT override;
-  const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION ~bad_alloc() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI bad_array_new_length : public bad_alloc {
 public:
-  bad_array_new_length() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_EXCEPTION bad_array_new_length() _NOEXCEPT;
   _LIBCPP_HIDE_FROM_ABI bad_array_new_length(const bad_array_new_length&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI bad_array_new_length& operator=(const bad_array_new_length&) _NOEXCEPT = default;
-  ~bad_array_new_length() _NOEXCEPT override;
-  const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION ~bad_array_new_length() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
 };
+
+#ifdef _LIBCPP_CONSTEXPR_EXCEPTIONS_ENABLED
+constexpr bad_alloc::bad_alloc() _NOEXCEPT: exception() { }
+constexpr bad_alloc::~bad_alloc() _NOEXCEPT { }
+constexpr const char * bad_alloc::what() const _NOEXCEPT { return "std::bad_alloc"; }
+constexpr bad_array_new_length::bad_array_new_length() _NOEXCEPT: bad_alloc() { }
+constexpr bad_array_new_length::~bad_array_new_length() _NOEXCEPT { }
+constexpr const char * bad_array_new_length::what() const _NOEXCEPT { return "std::bad_array_new_length"; }
+#endif //!_LIBCPP_DISABLE_CONSTEXPR_EXCEPTIONS
+
 
 typedef void (*new_handler)();
 _LIBCPP_EXPORTED_FROM_ABI new_handler set_new_handler(new_handler) _NOEXCEPT;

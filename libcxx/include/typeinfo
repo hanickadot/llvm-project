@@ -327,21 +327,30 @@ public:
 
 class _LIBCPP_EXPORTED_FROM_ABI bad_cast : public exception {
 public:
-  bad_cast() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_EXCEPTION bad_cast() _NOEXCEPT;
   _LIBCPP_HIDE_FROM_ABI bad_cast(const bad_cast&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI bad_cast& operator=(const bad_cast&) _NOEXCEPT = default;
-  ~bad_cast() _NOEXCEPT override;
-  const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION ~bad_cast() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
 };
 
 class _LIBCPP_EXPORTED_FROM_ABI bad_typeid : public exception {
 public:
-  bad_typeid() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_EXCEPTION bad_typeid() _NOEXCEPT;
   _LIBCPP_HIDE_FROM_ABI bad_typeid(const bad_typeid&) _NOEXCEPT            = default;
   _LIBCPP_HIDE_FROM_ABI bad_typeid& operator=(const bad_typeid&) _NOEXCEPT = default;
-  ~bad_typeid() _NOEXCEPT override;
-  const char* what() const _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION ~bad_typeid() _NOEXCEPT override;
+  _LIBCPP_CONSTEXPR_EXCEPTION const char* what() const _NOEXCEPT override;
 };
+
+#ifdef _LIBCPP_CONSTEXPR_EXCEPTIONS_ENABLED
+constexpr bad_cast::bad_cast() _NOEXCEPT: exception() { }
+constexpr bad_cast::~bad_cast() _NOEXCEPT { }
+constexpr const char * bad_cast::what() const _NOEXCEPT { return "std::bad_cast"; }
+constexpr bad_typeid::bad_typeid() _NOEXCEPT: exception() { }
+constexpr bad_typeid::~bad_typeid() _NOEXCEPT { }
+constexpr const char * bad_typeid::what() const _NOEXCEPT { return "std::bad_typeid"; }
+#endif //!_LIBCPP_DISABLE_CONSTEXPR_EXCEPTIONS
 
 } // namespace std
 

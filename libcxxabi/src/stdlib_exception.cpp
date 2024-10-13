@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define _LIBCPP_DISABLE_CONSTEXPR_EXCEPTIONS
 #include <new>
 #include <exception>
 
