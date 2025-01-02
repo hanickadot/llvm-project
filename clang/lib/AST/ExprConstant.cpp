@@ -8450,6 +8450,24 @@ public:
 
     const FunctionDecl *Definition = nullptr;
     Stmt *Body = FD->getBody(Definition);
+    
+    if (FD->isInStdNamespace()) {
+      if (FD->getReturnType()->isVoidType()) {
+        const auto *FPT = FD->getType()->castAs<FunctionProtoType>();
+        if (FPT->getNumParams() == 0) {
+          
+          if (const auto * II = FD->getIdentifier()) {
+            if (II->isStr("unreachable")) {
+              Info.FFDiag(E, diag::note_unreachable_code);
+              return false;
+            } else if (II->isStr("terminate")) {
+              Info.FFDiag(E, diag::note_constant_evaluation_terminated);
+              return false;
+            }
+          }
+        }
+      }
+    }
 
     if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body) ||
         !HandleFunctionCall(E->getExprLoc(), Definition, This, E, Args, Call,
@@ -8460,6 +8478,11 @@ public:
         !HandleCovariantReturnAdjustment(Info, E, Result,
                                          CovariantAdjustmentPath))
       return false;
+    
+    if (FD->isNoReturn()) {
+      Info.FFDiag(E->getExprLoc(), diag::note_return_from_noreturn_call);
+      return false;
+    }
 
     if (!CallScope.destroy()) 
       return false;
@@ -12773,6 +12796,10 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (!EvaluatePointer(E->getArg(0), LV, Info)) {
       return false;
     }
+    
+    if (LV.InvalidBase) {
+      return Success(false, E);
+    }
   
     const auto Base = LV.getLValueBase();
     return Success((bool)Base.dyn_cast<DynamicAllocLValue>(), E);
@@ -12781,6 +12808,10 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     LValue LV;
     if (!EvaluatePointer(E->getArg(0), LV, Info)) {
       return false;
+    }
+    
+    if (LV.InvalidBase) {
+      return Success(false, E);
     }
   
     const auto Base = LV.getLValueBase();
@@ -12791,19 +12822,30 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return Success(false, E);
   }
   case Builtin::BI__consteval_points_to_type_info: {
-    return false;
-    //LValue LV;
-    //if (!EvaluatePointer(E->getArg(0), LV, Info)) {
-    //  return false;
-    //}
-    //
-    //const auto Base = LV.getLValueBase();
-    //return Success((bool)Base.dyn_cast<const TypeInfoLValue *>(), E);
+    LValue LV;
+    if (!EvaluatePointer(E->getArg(0), LV, Info)) {
+      return false;
+    }
+    
+    if (LV.InvalidBase) {
+      return Success(false, E);
+    }
+  
+    const auto Base = LV.getLValueBase();
+    if (Base.dyn_cast<TypeInfoLValue>()) {
+      return Success(true, E);
+    }
+    
+    return Success(false, E);
   }
   case Builtin::BI__consteval_points_to_global: {
     LValue LV;
     if (!EvaluatePointer(E->getArg(0), LV, Info)) {
       return false;
+    }
+    
+    if (LV.InvalidBase) {
+      return Success(false, E);
     }
   
     const auto Base = LV.getLValueBase();
@@ -12819,6 +12861,10 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       return false;
     }
   
+    if (LV.InvalidBase) {
+      return Success(false, E);
+    }
+  
     const auto Base = LV.getLValueBase();
     
     if (const auto *VD = dyn_cast_or_null<VarDecl>(Base.dyn_cast<const ValueDecl *>())) {
@@ -12831,6 +12877,10 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     LValue LV;
     if (!EvaluatePointer(E->getArg(0), LV, Info)) {
       return false;
+    }
+    
+    if (LV.InvalidBase) {
+      return Success(false, E);
     }
   
     return Success(LV.getLValueDesignator().isOnePastTheEnd(), E);
@@ -16066,6 +16116,10 @@ public:
       // The argument is not evaluated!
       return true;
 
+    case Builtin::BI__builtin_unreachable:
+      Info.FFDiag(E, diag::note_unreachable_code);
+      return false;
+      
     case Builtin::BI__builtin_operator_delete:
       return HandleOperatorDeleteCall(Info, E);
 

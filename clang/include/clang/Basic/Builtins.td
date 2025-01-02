@@ -1166,7 +1166,7 @@ def Debugtrap : Builtin {
 
 def Unreachable : Builtin {
   let Spellings = ["__builtin_unreachable"];
-  let Attributes = [NoThrow, NoReturn];
+  let Attributes = [NoThrow, NoReturn, Constexpr];
   let Prototype = "void()";
 }
 
