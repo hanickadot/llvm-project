@@ -3351,23 +3351,6 @@ bool FunctionDecl::isReservedGlobalPlacementOperator() const {
   return (proto->getParamType(1).getCanonicalType() == Context.VoidPtrTy);
 }
 
-bool FunctionDecl::isUnreachable() const {
-  if (!isInStdNamespace())
-    return false;
-  
-  if (!getReturnType()->isVoidType())
-    return false;
-  
-  const auto *FPT = getType()->castAs<FunctionProtoType>();
-  if (FPT->getNumParams() != 0)
-    return false;
-  
-  if (!isNamed(this, "unreachable"))
-    return false;
-  
-  return true;
-}
-
 bool FunctionDecl::isReplaceableGlobalAllocationFunction(
     std::optional<unsigned> *AlignmentParam, bool *IsNothrow) const {
   if (getDeclName().getNameKind() != DeclarationName::CXXOperatorName)
