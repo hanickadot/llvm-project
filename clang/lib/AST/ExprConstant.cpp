@@ -17730,7 +17730,13 @@ static void DiagnoseUnhandledException(const CXXThrowExpr * E, const APValue & T
   
   // if there `.what() const` member returning `const char *`
   if (auto Message = TryAccessWhat(E, ThisVal, Info)) {
-    Info.CCEDiag(E->getSubExpr(), diag::note_constexpr_unhandled_exception_with_message) << E->getSubExpr()->getType() << *Message;
+    //const bool structure = E->getSubExpr()->getType()->isStructuralType();
+    Info.CCEDiag(E, diag::note_constexpr_unhandled_exception_with_message) << *Message;
+    //if (structure) {
+    //  auto * type = E->getSubExpr()->getType()->getAsStructureType()->getDecl();
+    //  Info.Note(type->getBeginLoc(), diag::note_type_of_unhandled_exception) << E->getSubExpr()->getType();
+    //}
+   
   } else if (Info.Ctx.getTypeSizeInChars(E->getSubExpr()->getType()).isOne()) {
     // FIXME: it should be empty types, but now it is sizeof(T) == 1
     Info.CCEDiag(E->getSubExpr(), diag::note_constexpr_unhandled_exception) << E->getSubExpr()->getType();

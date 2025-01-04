@@ -397,6 +397,8 @@ def note_constexpr_unhandled_exception_with_content : Note<
   "unhandled exception of type %0 with content %1 thrown from here">;
 def note_constexpr_unhandled_exception_with_message : Note<
   "unhandled exception: %0">;
+def note_type_of_unhandled_exception : Note<
+  "of type: %0">;
 def note_constexpr_unhandled_exception_message : Note<
   "exception: %0">;
 def note_constexpr_unhandled_exception : Note<
