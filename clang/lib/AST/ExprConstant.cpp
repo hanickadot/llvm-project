@@ -8461,7 +8461,7 @@ public:
               Info.FFDiag(E, diag::note_unreachable_code);
               return false;
             } else if (II->isStr("terminate")) {
-              Info.FFDiag(E, diag::note_constant_evaluation_terminated);
+              Info.CCEDiag(E, diag::note_constant_evaluation_terminated);
               return false;
             }
           }
@@ -16143,9 +16143,7 @@ public:
     {
       auto result = ConvertPointerToString(E->getArg(0), Info);
       if (result) {
-        std::cout << "constexpr error: " << *result << "\n";
-      
-        Info.FFDiag(E, diag::custom_constexpr_error) << *result;
+        Info.FFDiag(Info.CurrentCall->CallExpr, diag::err_custom_constexpr_error) << *result;
       }
       return false;
     }

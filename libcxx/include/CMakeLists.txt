@@ -852,6 +852,7 @@ set(files
   __utility/convert_to_integral.h
   __utility/declval.h
   __utility/empty.h
+  __utility/error_str.h
   __utility/exception_guard.h
   __utility/exchange.h
   __utility/forward.h

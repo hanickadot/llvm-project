@@ -3527,6 +3527,8 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI_rotr64:
     return emitRotate(E, true);
 
+  case Builtin::BI__constexpr_error: 
+    return RValue::get(nullptr);
   case Builtin::BI__builtin_constant_p: {
     llvm::Type *ResultType = ConvertType(E->getType());
 

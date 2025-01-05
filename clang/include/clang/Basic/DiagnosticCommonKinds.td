@@ -297,7 +297,10 @@ def note_constexpr_invalid_template_arg : Note<
   "predefined '%3' variable}2 is not allowed in a template argument">;
 def err_constexpr_invalid_template_arg : Error<
   note_constexpr_invalid_template_arg.Summary>;
-
+def note_constant_evaluation_terminated : Note<"evaluation aborted">;
+def err_custom_constexpr_error : Error<"custom constexpr error: '%0'">;
+def err_constexpr_assertion_failure : Error<"constexpr assertion failure: '%0'">;
+  
 // Sema && Frontend
 let CategoryName = "Inline Assembly Issue" in {
 def err_asm_invalid_type_in_input : Error<

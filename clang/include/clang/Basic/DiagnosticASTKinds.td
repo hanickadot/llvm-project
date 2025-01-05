@@ -411,8 +411,6 @@ def note_constexpr_exception_thrown_here : Note<
   "exception thrown here">;
 def note_constexpr_throwing_not_allowed_prior_cpp26 : Note<
   "throwing exception is not allowed prior C++26">;
-def err_constexpr_assertion_failure : Error<
-  "constexpr assertion failure: '%0'">;
 def note_constexpr_unsupported_layout : Note<
   "type %0 has unexpected layout">;
 def note_constexpr_unsupported_flexible_array : Note<
@@ -423,9 +421,6 @@ def note_constexpr_assumption_failed : Note<
   "assumption evaluated to false">;
 def err_experimental_clang_interp_failed : Error<
   "the experimental clang interpreter failed to evaluate an expression">;
-def custom_constexpr_error : Error<
-  "custom constexpr error: '%0'">;
-def note_constant_evaluation_terminated : Note<"evaluation aborted">;
 def note_unreachable_code : Note<"unreachable code path">;
 def note_return_from_noreturn_call : Note<
   "returning from function marked [[noreturn]]">;

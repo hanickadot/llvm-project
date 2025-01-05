@@ -14341,6 +14341,50 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
     } else {
       // Evaluate the initializer to see if it's a constant initializer.
       HasConstInit = var->checkForConstantInitialization(Notes);
+      SourceLocation DiagLoc = var->getLocation();
+      
+      if (std::any_of(Notes.begin(), Notes.end(), [&](const PartialDiagnosticAt & pda){
+        if (pda.second.getDiagID() == diag::note_constant_evaluation_terminated) {
+          DiagLoc = Notes[0].first;
+          return true;
+        } else {
+          return false;
+        }
+      })) {
+        Diag(var->getLocation(), diag::err_constant_evaluation_terminated);
+        Diag(DiagLoc, diag::note_reaching_terminate);
+        return;
+      }
+      
+      StringRef msg;
+      
+      if (std::any_of(Notes.begin(), Notes.end(), [&](PartialDiagnosticAt & pda){
+        if (pda.second.getDiagID() == diag::err_custom_constexpr_error) {
+          DiagLoc = Notes[0].first;
+          msg = pda.second.getStringArg(0);
+          return true;
+        } else {
+          return false;
+        }
+      })) {
+        Diag(var->getLocation(), diag::err_custom_constexpr_error) << msg;
+        Diag(DiagLoc, diag::note_reaching_terminate);
+        return;
+      }
+      
+      if (std::any_of(Notes.begin(), Notes.end(), [&](PartialDiagnosticAt & pda){
+        if (pda.second.getDiagID() == diag::err_constexpr_assertion_failure) {
+          DiagLoc = Notes[0].first;
+          msg = pda.second.getStringArg(0);
+          return true;
+        } else {
+          return false;
+        }
+      })) {
+        Diag(var->getLocation(), diag::err_constexpr_assertion_failure) << msg;
+        Diag(DiagLoc, diag::note_reaching_terminate);
+        return;
+      }
     }
 
     if (HasConstInit) {

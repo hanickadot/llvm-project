@@ -675,6 +675,9 @@ def warn_cxx17_compat_exception_spec_in_signature : Warning<
   "mangled name of %0 will change in C++17 due to non-throwing exception "
   "specification in function signature">, InGroup<CXX17CompatMangling>;
 
+def err_constant_evaluation_terminated : Error<"constant evaluation terminated">;
+def note_reaching_terminate : Note<"constant evaluation reached here">;
+
 def warn_global_constructor : Warning<
   "declaration requires a global constructor">,
   InGroup<GlobalConstructors>, DefaultIgnore;
