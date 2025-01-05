@@ -17,8 +17,12 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 
 #if _LIBCPP_STD_VER >= 26
 
-[[noreturn]] _LIBCPP_HIDE_FROM_ABI constexpr void constexpr_error_str(const char * msg) {
+[[noreturn]] _LIBCPP_HIDE_FROM_ABI constexpr void constexpr_error_str(const char * msg) noexcept {
   __constexpr_error(msg);
+}
+
+_LIBCPP_HIDE_FROM_ABI constexpr void constexpr_print_str(const char * msg) noexcept {
+  __constexpr_print(msg);
 }
 
 #endif
