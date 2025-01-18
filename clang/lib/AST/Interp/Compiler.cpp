@@ -2490,6 +2490,17 @@ bool Compiler<Emitter>::VisitCXXNoexceptExpr(const CXXNoexceptExpr *E) {
 }
 
 template <class Emitter>
+bool Compiler<Emitter>::VisitCXXDeclcallExpr(const CXXDeclcallExpr *E) {
+  assert(false && "unimplemented");
+  return false;
+  //assert(E->getType()->isBooleanType());
+  //
+  //if (DiscardResult)
+  //  return true;
+  //return this->emitConstBool(E->getValue(), E);
+}
+
+template <class Emitter>
 bool Compiler<Emitter>::VisitCXXConstructExpr(const CXXConstructExpr *E) {
   QualType T = E->getType();
   assert(!classify(T));

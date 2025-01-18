@@ -2458,7 +2458,7 @@ ConstantEmitter::tryEmitPrivate(const APValue &Value, QualType DestType,
                              Filler);
   }
   case APValue::MemberPointer:
-    return CGM.getCXXABI().EmitMemberPointer(Value, DestType);
+    return CGM.getCXXABI().EmitMemberPointer(Value, DestType, !Value.isDeVirtualized());
   }
   llvm_unreachable("Unknown APValue kind");
 }

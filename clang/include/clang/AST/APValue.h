@@ -359,8 +359,8 @@ public:
     MakeUnion(); setUnion(D, V);
   }
   APValue(const ValueDecl *Member, bool IsDerivedMember,
-          ArrayRef<const CXXRecordDecl*> Path) : Kind(None) {
-    MakeMemberPointer(Member, IsDerivedMember, Path);
+          ArrayRef<const CXXRecordDecl*> Path, bool DeVirtualized = false) : Kind(None) {
+    MakeMemberPointer(Member, IsDerivedMember, Path, DeVirtualized);
   }
   APValue(const AddrLabelExpr* LHSExpr, const AddrLabelExpr* RHSExpr)
       : Kind(None) {
@@ -580,6 +580,7 @@ public:
   const ValueDecl *getMemberPointerDecl() const;
   bool isMemberPointerToDerivedMember() const;
   ArrayRef<const CXXRecordDecl*> getMemberPointerPath() const;
+  bool isDeVirtualized() const;
 
   const AddrLabelExpr* getAddrLabelDiffLHS() const {
     assert(isAddrLabelDiff() && "Invalid accessor");
@@ -678,7 +679,7 @@ private:
     Kind = Union;
   }
   void MakeMemberPointer(const ValueDecl *Member, bool IsDerivedMember,
-                         ArrayRef<const CXXRecordDecl*> Path);
+                         ArrayRef<const CXXRecordDecl*> Path, bool DeVirtualized);
   void MakeAddrLabelDiff() {
     assert(isAbsent() && "Bad state change");
     new ((void *)(char *)&Data) AddrLabelDiffData();
@@ -701,7 +702,7 @@ private:
                   bool OnePastTheEnd, bool IsNullPtr);
   MutableArrayRef<const CXXRecordDecl *>
   setMemberPointerUninit(const ValueDecl *Member, bool IsDerivedMember,
-                         unsigned Size);
+                         unsigned Size, bool DeVirtualized);
 };
 
 } // end namespace clang.

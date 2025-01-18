@@ -1791,6 +1791,25 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
     AllowSuffix = false;
     break;
 
+  case tok::kw_declcall: {
+    SourceLocation KeyLoc = ConsumeToken();
+    BalancedDelimiterTracker T(*this, tok::l_paren);
+
+    if (T.expectAndConsume(diag::err_expected_lparen_after, "declcall"))
+      return ExprError();
+    
+    // it can't be marked as unevaluated as we need to keep all the instantiations
+    Res = ParseExpression();
+    
+    T.consumeClose();
+    
+    if (!Res.isInvalid())
+      Res = Actions.ActOnDeclcallExpr(KeyLoc, T.getOpenLocation(), Res.get(),
+                                      T.getCloseLocation());
+    AllowSuffix = false;
+    break;
+  }
+
   case tok::kw_noexcept: { // [C++0x] 'noexcept' '(' expression ')'
     if (NotPrimaryExpression)
       *NotPrimaryExpression = true;

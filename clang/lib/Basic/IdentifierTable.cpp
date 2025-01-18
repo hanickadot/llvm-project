@@ -111,8 +111,9 @@ enum TokenKey : unsigned {
   KEYNOZOS = 0x4000000,
   KEYHLSL = 0x8000000,
   KEYFIXEDPOINT = 0x10000000,
+  KEYCXX26 = 0x20000000,
   KEYMAX = KEYFIXEDPOINT, // The maximum key
-  KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX20,
+  KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX20 | KEYCXX26,
   KEYALL = (KEYMAX | (KEYMAX - 1)) & ~KEYNOMS18 & ~KEYNOOPENCL &
            ~KEYNOZOS // KEYNOMS18, KEYNOOPENCL, KEYNOZOS are excluded.
 };
@@ -158,6 +159,10 @@ static KeywordStatus getKeywordStatusHelper(const LangOptions &LangOpts,
     return LangOpts.CPlusPlus ? KS_Future : KS_Unknown;
   case KEYCXX20:
     if (LangOpts.CPlusPlus20)
+      return KS_Enabled;
+    return LangOpts.CPlusPlus ? KS_Future : KS_Unknown;
+  case KEYCXX26:
+    if (LangOpts.CPlusPlus26)
       return KS_Enabled;
     return LangOpts.CPlusPlus ? KS_Future : KS_Unknown;
   case KEYGNU:
@@ -861,6 +866,9 @@ IdentifierTable::getFutureCompatDiagKind(const IdentifierInfo &II,
     if (((Flags & KEYCXX20) == KEYCXX20) ||
         ((Flags & CHAR8SUPPORT) == CHAR8SUPPORT))
       return diag::warn_cxx20_keyword;
+    
+    if ((Flags & KEYCXX26) == KEYCXX26)
+      return diag::warn_cxx26_keyword;
   } else {
     if ((Flags & KEYC99) == KEYC99)
       return diag::warn_c99_keyword;

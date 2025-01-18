@@ -162,6 +162,13 @@ public:
       return true;
     return VisitorBase::TraverseCXXNoexceptExpr(Node);
   }
+  
+  bool TraverseCXXDeclcallExpr(CXXDeclcallExpr *Node) {
+    // Unevaluated context.
+    if (ignoreUnevaluatedContext)
+      return true;
+    return VisitorBase::TraverseCXXDeclcallExpr(Node);
+  }
 
   bool TraverseCXXTypeidExpr(CXXTypeidExpr *Node) {
     // Unevaluated context.
