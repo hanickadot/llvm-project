@@ -242,7 +242,7 @@ def note_constexpr_access_static_temporary : Note<
 def note_constexpr_access_unreadable_object : Note<
   "%sub{access_kind}0 object '%1' whose value is not known">;
 def note_constexpr_access_deleted_object : Note<
-  "%sub{access_kind}0 heap allocated object that has been deleted">;
+  "%sub{access_kind}0 heap allocated object that has been deleted or pointer was invalidated">;
 def note_constexpr_modify_global : Note<
   "a constant expression cannot modify an object that is visible outside "
   "that expression">;
