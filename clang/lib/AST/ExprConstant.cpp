@@ -1649,6 +1649,10 @@ namespace {
     unsigned getLValueCallIndex() const { return Base.getCallIndex(); }
     unsigned getLValueVersion() const { return Base.getVersion(); }
 
+    bool isWithinBoundary() const {
+      return !InvalidBase && Base.isWithinOffsetRange(getLValueOffset().getQuantity());
+    }
+
     void moveInto(APValue &V) const {
       if (Designator.Invalid)
         V = APValue(Base, Offset, APValue::NoLValuePath(), IsNullPtr);
@@ -4567,6 +4571,11 @@ handleLValueToRValueConversion(EvalInfo &Info, const Expr *Conv, QualType Type,
                                bool WantObjectRepresentation = false) {
   if (LVal.Designator.Invalid)
     return false;
+  
+  if (!LVal.isWithinBoundary()) {
+    Info.FFDiag(Conv, diag::note_constexpr_outside_boundary);
+    return false;
+  }
 
   // Check for special cases where there is no existing APValue to look at.
   const Expr *Base = LVal.Base.dyn_cast<const Expr*>();
@@ -9858,6 +9867,29 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return Success(E);
 
   switch (BuiltinOp) {
+  case Builtin::BI__builtin_tighten_array_boundaries: {
+    if (!evaluatePointer(E->getArg(0), Result))
+      return Error(E);
+    
+    LValue Min, Max;
+    if (!evaluatePointer(E->getArg(1), Min))
+      return Error(E);
+    if (!evaluatePointer(E->getArg(2), Max))
+      return Error(E);
+    
+    if (!(HasSameBase(Min, Max) && HasSameBase(Result, Min))) {
+      return Error(E);
+    }
+    
+    const auto min_offset = Min.getLValueOffset().getQuantity();
+    const auto max_offset = Max.getLValueOffset().getQuantity();
+    
+    if (!Result.Base.tighten(min_offset, max_offset)) {
+      return Error(E);
+    }
+    
+    return true;
+  }
   case Builtin::BIaddressof:
   case Builtin::BI__addressof:
   case Builtin::BI__builtin_addressof:
@@ -12865,6 +12897,28 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   default:
     return false;
 
+  case Builtin::BI__builtin_is_within_boundaries: {
+    LValue Target;
+    if (!EvaluatePointer(E->getArg(0), Target, Info)) {
+      return Error(E);
+    }
+    
+    if (Target.isNullPointer()) {
+      return Success(0, E);
+    }
+    
+    if (Target.getLValueDesignator().Invalid) {
+      return Success(0, E);
+    }
+    
+    if (Target.getLValueDesignator().isOnePastTheEnd()) {
+      return Success(0, E);
+    }
+    
+    // TODO check for normal range, not just limited one
+    
+    return Success(Target.Base.isWithinOffsetRange(Target.getLValueOffset().getQuantity()), E);
+  }
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     // The type was checked when we built the expression.

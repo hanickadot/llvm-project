@@ -185,6 +185,8 @@ public:
     friend llvm::hash_code hash_value(const LValueBase &Base);
     friend struct llvm::DenseMapInfo<LValueBase>;
 
+    bool tighten(uint64_t _min, uint64_t _max);
+    bool isWithinOffsetRange(uint64_t idx) const;
   private:
     PtrTy Ptr;
     struct LocalState {
@@ -197,6 +199,8 @@ public:
       /// The QualType, if this is a DynamicAllocLValue.
       void *DynamicAllocType;
     };
+    uint64_t min = 0;
+    uint64_t max = (std::numeric_limits<uint64_t>::max)();
   };
 
   /// A FieldDecl or CXXRecordDecl, along with a flag indicating whether we
@@ -309,7 +313,7 @@ private:
   // We ensure elsewhere that Data is big enough for LV and MemberPointerData.
   typedef llvm::AlignedCharArrayUnion<void *, APSInt, APFloat, ComplexAPSInt,
                                       ComplexAPFloat, Vec, Arr, StructData,
-                                      UnionData, AddrLabelDiffData> DataType;
+                                      UnionData, AddrLabelDiffData, std::array<char, 64>> DataType;
   static const size_t DataSize = sizeof(DataType);
 
   DataType Data;

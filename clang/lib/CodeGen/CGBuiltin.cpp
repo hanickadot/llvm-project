@@ -3822,6 +3822,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
         FnExpect, {ArgValue, ExpectedValue, Confidence}, "expval");
     return RValue::get(Result);
   }
+  case Builtin::BI__builtin_tighten_array_boundaries: {
+    // TODO maybe add something?
+    const Expr *Ptr = E->getArg(0);
+    Value *PtrValue = EmitScalarExpr(Ptr);
+    return RValue::get(PtrValue);
+  }
   case Builtin::BI__builtin_assume_aligned: {
     const Expr *Ptr = E->getArg(0);
     Value *PtrValue = EmitScalarExpr(Ptr);
@@ -3970,6 +3976,8 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
       Result = Builder.CreateIntCast(Result, ResultType, /*isSigned*/false);
     return RValue::get(Result);
   }
+  case Builtin::BI__builtin_is_within_boundaries:
+    return RValue::get(ConstantInt::get(IntTy, 1));
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     unsigned Type =

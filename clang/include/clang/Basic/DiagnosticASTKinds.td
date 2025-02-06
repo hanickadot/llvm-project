@@ -79,6 +79,7 @@ def note_constexpr_subobject_declared_here : Note<
 def note_constexpr_array_index : Note<"cannot refer to element %0 of "
   "%select{array of %2 element%plural{1:|:s}2|non-array object}1 "
   "in a constant expression">;
+def note_constexpr_outside_boundary : Note<"cannot access outside of allowed boundary">;
 def note_constexpr_float_arithmetic : Note<
   "floating point arithmetic produces %select{an infinity|a NaN}0">;
 def note_constexpr_dynamic_rounding : Note<

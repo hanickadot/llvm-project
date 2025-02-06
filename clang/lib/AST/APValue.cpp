@@ -132,6 +132,26 @@ void APValue::LValueBase::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddInteger(Local.Version);
 }
 
+bool APValue::LValueBase::tighten(uint64_t _min, uint64_t _max) {
+  if (_min < min) {
+    return false;
+  }
+  if (_max > max) {
+    return false;
+  }
+  if (_min > _max) {
+    return false;
+  }
+  
+  min = _min;
+  max = _max;
+  return true;
+}
+bool APValue::LValueBase::isWithinOffsetRange(uint64_t idx) const {
+  assert(min <= max);
+  return min <= idx && idx < max;
+}
+
 namespace clang {
 bool operator==(const APValue::LValueBase &LHS,
                 const APValue::LValueBase &RHS) {

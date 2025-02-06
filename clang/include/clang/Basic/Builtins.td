@@ -5012,3 +5012,15 @@ def CountedByRef : Builtin {
   let Attributes = [NoThrow, CustomTypeChecking];
   let Prototype = "int(...)";
 }
+
+def TightenArrayBoundaries : Builtin {
+  let Spellings = ["__builtin_tighten_array_boundaries"];
+  let Attributes = [NoThrow, Const, Constexpr];
+  let Prototype = "void*(void*, void const*, void const*)";
+}
+
+def IsWithinBoundaries : Builtin {
+  let Spellings = ["__builtin_is_within_boundaries"];
+  let Attributes = [NoThrow, Const, Constexpr];
+  let Prototype = "bool(void const*)";
+}
