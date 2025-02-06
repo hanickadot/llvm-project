@@ -5024,3 +5024,9 @@ def IsWithinBoundaries : Builtin {
   let Attributes = [NoThrow, Const, Constexpr];
   let Prototype = "bool(void const*)";
 }
+
+def InvalidateOthers : Builtin {
+  let Spellings = ["__builtin_invalidate_others"];
+  let Attributes = [NoThrow, Const, Constexpr];
+  let Prototype = "void*(void*)";
+}

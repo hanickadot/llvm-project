@@ -9867,6 +9867,32 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return Success(E);
 
   switch (BuiltinOp) {
+  case Builtin::BI__builtin_invalidate_others: {
+    if (!evaluatePointer(E->getArg(0), Result))
+      return Error(E);
+    
+    if (!Result.Base.is<DynamicAllocLValue>()) {
+      Info.FFDiag(E->getArg(0), diag::note_constexpr_invalidating_nonheap_pointer);
+      return Error(E);
+    }
+
+    auto key = Result.Base.dyn_cast<DynamicAllocLValue>();
+    
+    auto handle = Info.HeapAllocs.extract(key);
+    if (!handle) {
+      Info.FFDiag(E->getArg(0), diag::note_constexpr_invalidating_nonheap_pointer);
+      return Error(E);
+    }
+    
+    // get new key
+    DynamicAllocLValue DA(Info.NumHeapAllocs++);
+    handle.key() = DA;
+    Result.Base.updateDynamicAlloc(DA);
+ 
+    // reinsert it back as a "new" allocation, this will invalidate all existing pointers to it
+    Info.HeapAllocs.insert(std::move(handle));
+    return true;
+  }
   case Builtin::BI__builtin_tighten_array_boundaries: {
     if (!evaluatePointer(E->getArg(0), Result))
       return Error(E);

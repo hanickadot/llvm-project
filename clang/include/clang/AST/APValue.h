@@ -187,6 +187,7 @@ public:
 
     bool tighten(uint64_t _min, uint64_t _max);
     bool isWithinOffsetRange(uint64_t idx) const;
+    void updateDynamicAlloc(DynamicAllocLValue LV);
   private:
     PtrTy Ptr;
     struct LocalState {

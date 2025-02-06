@@ -3822,6 +3822,12 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
         FnExpect, {ArgValue, ExpectedValue, Confidence}, "expval");
     return RValue::get(Result);
   }
+  case Builtin::BI__builtin_invalidate_others: {
+    // TODO maybe add something?
+    const Expr *Ptr = E->getArg(0);
+    Value *PtrValue = EmitScalarExpr(Ptr);
+    return RValue::get(PtrValue);
+  }
   case Builtin::BI__builtin_tighten_array_boundaries: {
     // TODO maybe add something?
     const Expr *Ptr = E->getArg(0);

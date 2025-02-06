@@ -151,6 +151,10 @@ bool APValue::LValueBase::isWithinOffsetRange(uint64_t idx) const {
   assert(min <= max);
   return min <= idx && idx < max;
 }
+void APValue::LValueBase::updateDynamicAlloc(DynamicAllocLValue LV) {
+  assert(is<DynamicAllocLValue>() && "not a dynamic allocation lvalue");
+  Ptr = LV;
+}
 
 namespace clang {
 bool operator==(const APValue::LValueBase &LHS,
