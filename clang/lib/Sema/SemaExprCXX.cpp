@@ -8474,8 +8474,7 @@ ExprResult Sema::BuildCXXDeclcallExpr(SourceLocation KeyLoc, Expr *Operand,
   }
 
   if (!mustBeEvaluableInCompileTime(Operand)) {
-    Diag(CE->getExprLoc(), diag::warn_declcall_must_be_constant_evaluable);
-    return ExprError();
+    Diag(CE->getExprLoc(), diag::err_declcall_must_be_constant_evaluable);
   }
 
   return new (Context)

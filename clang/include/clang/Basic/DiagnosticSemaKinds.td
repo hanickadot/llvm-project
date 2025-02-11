@@ -9278,8 +9278,8 @@ def err_declcall_must_contain_a_call : Error<
   "declcall doesn't contain a call">;
 def err_declcall_not_implemented_for : Error<
   "declcall doesn't support %0 yet">;
-def warn_declcall_must_be_constant_evaluable : Warning<
-  "declcall must be constant evaluable otherwise the expression (or its part) will be evaluated in runtime">;
+def err_declcall_must_be_constant_evaluable : Error<
+  "declcall must not depend on runtime known value">;
 
 // C++20 constinit and require_constant_initialization attribute
 def warn_cxx20_compat_constinit : Warning<
