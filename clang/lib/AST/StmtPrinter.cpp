@@ -2491,6 +2491,13 @@ void StmtPrinter::VisitCXXNoexceptExpr(CXXNoexceptExpr *E) {
   OS << ")";
 }
 
+void StmtPrinter::VisitCXXDeclcallExpr(CXXDeclcallExpr *E) {
+  OS << "declcall(";
+  PrintExpr(E->getOperand());
+  OS << ")";
+}
+
+
 void StmtPrinter::VisitPackExpansionExpr(PackExpansionExpr *E) {
   PrintExpr(E->getPattern());
   OS << "...";

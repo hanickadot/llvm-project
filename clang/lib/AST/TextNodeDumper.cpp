@@ -743,7 +743,7 @@ void TextNodeDumper::Visit(const APValue &Value, QualType Ty) {
     return;
   }
   case APValue::MemberPointer:
-    OS << "MemberPointer <todo>";
+    OS << "MemberPointer <todo> " << (Value.isDeVirtualized() ? "(devirtualized)":"");
     return;
   case APValue::AddrLabelDiff:
     OS << "AddrLabelDiff <todo>";
@@ -1562,6 +1562,15 @@ void TextNodeDumper::VisitCXXUnresolvedConstructExpr(
   dumpType(Node->getTypeAsWritten());
   if (Node->isListInitialization())
     OS << " list";
+}
+
+void TextNodeDumper::VisitCXXNoexceptExpr(const CXXNoexceptExpr *Node) {
+  if (Node->isValueDependent())
+    OS << " noexcept(<dependent>)";
+  else if (Node->getValue()) 
+    OS << " noexcept(true)";
+  else 
+    OS << " noexcept(false)";
 }
 
 void TextNodeDumper::VisitCXXConstructExpr(const CXXConstructExpr *Node) {

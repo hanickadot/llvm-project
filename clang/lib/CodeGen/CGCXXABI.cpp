@@ -106,7 +106,7 @@ CGCXXABI::EmitNullMemberPointer(const MemberPointerType *MPT) {
   return GetBogusMemberPointer(QualType(MPT, 0));
 }
 
-llvm::Constant *CGCXXABI::EmitMemberFunctionPointer(const CXXMethodDecl *MD) {
+llvm::Constant *CGCXXABI::EmitMemberFunctionPointer(const CXXMethodDecl *MD, bool AllowVirtual) {
   return GetBogusMemberPointer(CGM.getContext().getMemberPointerType(
       MD->getType(), MD->getParent()->getTypeForDecl()));
 }
@@ -116,7 +116,7 @@ llvm::Constant *CGCXXABI::EmitMemberDataPointer(const MemberPointerType *MPT,
   return GetBogusMemberPointer(QualType(MPT, 0));
 }
 
-llvm::Constant *CGCXXABI::EmitMemberPointer(const APValue &MP, QualType MPT) {
+llvm::Constant *CGCXXABI::EmitMemberPointer(const APValue &MP, QualType MPT, bool AllowVirtual) {
   return GetBogusMemberPointer(MPT);
 }
 

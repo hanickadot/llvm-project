@@ -3618,6 +3618,7 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case ArrayTypeTraitExprClass:
   case ExpressionTraitExprClass:
   case CXXNoexceptExprClass:
+  case CXXDeclcallExprClass:
   case SizeOfPackExprClass:
   case ObjCStringLiteralClass:
   case ObjCEncodeExprClass:
