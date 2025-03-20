@@ -1411,6 +1411,14 @@ void Sema::DiagnoseUnsatisfiedConstraint(
   assert(!Satisfaction.IsSatisfied &&
          "Attempted to diagnose a satisfied constraint");
   for (auto &Record : Satisfaction) {
+    if (auto * E = dyn_cast<Expr *>(Record)) {
+      if (diagnoseException(First, *this, E)) {
+        return;
+      }
+    }
+    
+  }
+  for (auto &Record : Satisfaction) {
     diagnoseUnsatisfiedConstraintExpr(*this, Record, First);
     First = false;
   }
