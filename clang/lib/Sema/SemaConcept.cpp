@@ -29,6 +29,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
+#include "clang/Basic/DiagnosticAST.h"
 #include <optional>
 
 using namespace clang;
@@ -388,6 +389,20 @@ calculateConstraintSatisfaction(Sema &S, const Expr *ConstraintExpr,
   if (!SubstitutedAtomicExpr.get()->EvaluateAsConstantExpr(EvalResult,
                                                            S.Context) ||
       !EvaluationDiags.empty()) {
+    
+    // if requires expression failed due thrown exception during constant evaluation, consider it sfinaeble error
+    constexpr auto CheckForException = [](const std::pair<clang::SourceLocation, clang::PartialDiagnostic> & pair) -> bool {
+      const auto id = pair.second.getDiagID();
+      return id == diag::note_constexpr_unhandled_exception_with_message || id == diag::note_constexpr_unhandled_exception_with_content || id == diag::note_constexpr_unhandled_exception;
+    };
+    
+    if (std::any_of(EvaluationDiags.begin(), EvaluationDiags.end(), CheckForException)) {
+      Satisfaction.IsSatisfied = false;
+      if (!Satisfaction.IsSatisfied)
+        Satisfaction.Details.emplace_back(SubstitutedAtomicExpr.get());
+      return SubstitutedAtomicExpr;
+    }
+    
     // C++2a [temp.constr.atomic]p1
     //   ...E shall be a constant expression of type bool.
     S.Diag(SubstitutedAtomicExpr.get()->getBeginLoc(),
@@ -1221,6 +1236,39 @@ static void diagnoseUnsatisfiedRequirement(Sema &S,
   }
 }
 
+static bool diagnoseException(bool First, Sema &S, Expr * Expr) {
+  EnterExpressionEvaluationContext ConstantEvaluated(
+      S, Sema::ExpressionEvaluationContext::ConstantEvaluated);
+  SmallVector<PartialDiagnosticAt, 2> EvaluationDiags;
+  Expr::EvalResult EvalResult;
+  EvalResult.Diag = &EvaluationDiags;
+  
+  if (Expr->EvaluateAsConstantExpr(EvalResult, S.Context) && EvaluationDiags.empty()) {
+    return false;
+  }
+
+  // if requires expression failed due thrown exception during constant evaluation, consider it sfinaeble error
+  constexpr auto CheckForException = [](const std::pair<clang::SourceLocation, clang::PartialDiagnostic> & pair) -> bool {
+    const auto id = pair.second.getDiagID();
+    return id == diag::note_constexpr_unhandled_exception_with_message || id == diag::note_constexpr_unhandled_exception_with_content || id == diag::note_constexpr_unhandled_exception;
+  };
+  
+  if (!std::any_of(EvaluationDiags.begin(), EvaluationDiags.end(), CheckForException)) {
+    return false;
+  }
+  
+  // C++2a [temp.constr.atomic]p1
+  //   ...E shall be a constant expression of type bool.
+  S.Diag(Expr->getSourceRange().getBegin(),
+         diag::note_atomic_constraint_evaluated_to_exception)
+      << (int)First << Expr;
+  
+  for (const PartialDiagnosticAt &PDiag : EvaluationDiags)
+    S.Diag(PDiag.first, PDiag.second);
+  return true;
+  
+}
+
 static void diagnoseWellFormedUnsatisfiedConstraintExpr(Sema &S,
                                                         Expr *SubstExpr,
                                                         bool First) {
@@ -1325,9 +1373,11 @@ static void diagnoseWellFormedUnsatisfiedConstraintExpr(Sema &S,
     return;
   }
 
-  S.Diag(SubstExpr->getSourceRange().getBegin(),
-         diag::note_atomic_constraint_evaluated_to_false)
-      << (int)First << SubstExpr;
+  if (!diagnoseException(First, S, SubstExpr)) {
+    S.Diag(SubstExpr->getSourceRange().getBegin(),
+           diag::note_atomic_constraint_evaluated_to_false)
+        << (int)First << SubstExpr;
+  }
 }
 
 template <typename SubstitutionDiagnostic>

@@ -3025,6 +3025,8 @@ def note_constraint_references_error
     : Note<"constraint depends on a previously diagnosed expression">;
 def note_atomic_constraint_evaluated_to_false : Note<
   "%select{and|because}0 '%1' evaluated to false">;
+def note_atomic_constraint_evaluated_to_exception : Note<
+  "%select{and|because}0 '%1' throws an exception">;
 def note_concept_specialization_constraint_evaluated_to_false : Note<
   "%select{and|because}0 '%1' evaluated to false">;
 def note_single_arg_concept_specialization_constraint_evaluated_to_false : Note<
