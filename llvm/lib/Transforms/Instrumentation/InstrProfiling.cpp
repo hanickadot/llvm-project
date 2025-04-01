@@ -1671,6 +1671,7 @@ InstrLowerer::createRegionCounters(InstrProfCntrInstBase *Inc, StringRef Name,
                             Name);
     GV->setAlignment(Align(1));
   } else {
+    // TODO generate defaults based on constant evaluation
     auto *CounterTy = ArrayType::get(Type::getInt64Ty(Ctx), NumCounters);
     GV = new GlobalVariable(M, CounterTy, false, Linkage,
                             Constant::getNullValue(CounterTy), Name);

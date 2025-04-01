@@ -24,6 +24,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include <optional>
+#include <iostream>
 
 // This selects the coverage mapping format defined when `InstrProfData.inc`
 // is textually included.
@@ -297,6 +298,10 @@ public:
       return Loc.getLocWithOffset(SM.getFileIDSize(SM.getFileID(Loc)) -
                                   SM.getFileOffset(Loc));
     return SM.getLocForEndOfFile(SM.getFileID(Loc));
+  }
+  
+  const ASTContext & getContext() const {
+    return CVM.getCodeGenModule().getContext();
   }
 
   /// Find out where a macro is expanded. If the immediate result is a
@@ -931,7 +936,19 @@ struct CounterCoverageMappingBuilder
   ///
   /// This should only be called on statements that have a dedicated counter.
   Counter getRegionCounter(const Stmt *S) {
-    return Counter::getCounter(CounterMap[S].Executed);
+    auto c = Counter::getCounter(CounterMap[S].Executed);
+    c.setConstantEvaluations(getContext().constantCodeCoverageCount(S));
+    return c;
+  }
+  
+  Counter getZero(const Stmt *S) {
+    auto c = Counter::getZero();
+    unsigned ce = getContext().constantCodeCoverageCount(S);
+    if (ce) {
+      std::cout << "getZero(" << S << ") -> " << ce << "\n";
+    }
+    c.setConstantEvaluations(ce);
+    return c;
   }
 
   struct BranchCounterPair {
@@ -1315,7 +1332,7 @@ struct CounterCoverageMappingBuilder
     SourceLocation EndLoc = getEnd(S);
     if (!Region.hasEndLoc())
       Region.setEndLoc(EndLoc);
-    pushRegion(Counter::getZero());
+    pushRegion(getZero(S));
     HasTerminateStmt = true;
   }
 
@@ -1481,10 +1498,11 @@ struct CounterCoverageMappingBuilder
   void VisitStmt(const Stmt *S) {
     if (S->getBeginLoc().isValid())
       extendRegion(S);
+    
     const Stmt *LastStmt = nullptr;
     bool SaveTerminateStmt = HasTerminateStmt;
     HasTerminateStmt = false;
-    GapRegionCounter = Counter::getZero();
+    GapRegionCounter = getZero(S);
     for (const Stmt *Child : S->children())
       if (Child) {
         // If last statement contains terminate statements, add a gap area
@@ -1868,7 +1886,7 @@ struct CounterCoverageMappingBuilder
         // Make a region for the body of the switch.  If the body starts with
         // a case, that case will reuse this region; otherwise, this covers
         // the unreachable code at the beginning of the switch body.
-        size_t Index = pushRegion(Counter::getZero(), getStart(CS));
+        size_t Index = pushRegion(getZero(S), getStart(CS));
         getRegion().setGap(true);
         Visit(Body);
 
@@ -1881,7 +1899,7 @@ struct CounterCoverageMappingBuilder
         popRegions(Index);
       }
     } else
-      propagateCounts(Counter::getZero(), Body);
+      propagateCounts(getZero(S), Body);
     BreakContinue BC = BreakContinueStack.pop_back_val();
 
     if (!BreakContinueStack.empty() && !llvm::EnableSingleByteCoverage)
@@ -1922,7 +1940,7 @@ struct CounterCoverageMappingBuilder
       // really slow on top of switches with thousands of cases. Instead,
       // trigger simplification by adding zero to the last counter.
       CaseCountSum =
-          addCounters(CaseCountSum, Counter::getZero(), /*Simplify=*/true);
+          addCounters(CaseCountSum, getZero(S), /*Simplify=*/true);
 
       // This is considered as the False count on SwitchStmt.
       Counter SwitchFalse = subtractCounters(ParentCount, CaseCountSum);
@@ -2059,7 +2077,7 @@ struct CounterCoverageMappingBuilder
         (llvm::EnableSingleByteCoverage
              ? BranchCounterPair{getRegionCounter(S->getThen()),
                                  (S->getElse() ? getRegionCounter(S->getElse())
-                                               : Counter::getZero())}
+                                               : getZero(S))}
              : getBranchCounterPair(S, ParentCount));
 
     // Emitting a counter for the condition makes it easier to interpret the

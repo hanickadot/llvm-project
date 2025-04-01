@@ -180,8 +180,15 @@ void CounterMappingContext::dump(const Counter &C, raw_ostream &OS) const {
     break;
   }
   }
-  if (CounterValues.empty())
+  
+  if (unsigned v = C.getConstantEvaluations()) {
+    OS << "{" << v << "}";
+  }
+  
+  if (CounterValues.empty()) {
     return;
+  }
+   
   Expected<int64_t> Value = evaluate(C);
   if (auto E = Value.takeError()) {
     consumeError(std::move(E));

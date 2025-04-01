@@ -1044,6 +1044,13 @@ namespace {
       IsEvaluatingDecl = EDK;
       EvaluatingDeclValue = &Value;
     }
+    
+    void constantCodeCoverageEnter(const Stmt * stmt) {
+      if (Ctx.getLangOpts().CPlusPlus &&
+          (EvalMode == EvalInfo::EM_ConstantExpression || EvalMode == EvalInfo::EM_ConstantExpressionUnevaluated)) {
+            getASTContext().constantCodeCoverageEnter(stmt);
+          }
+    }
 
     bool CheckCallLimit(SourceLocation Loc) {
       // Don't perform any constexpr calls (other than the call we're checking)
@@ -5528,6 +5535,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
   switch (S->getStmtClass()) {
   default:
     if (const Expr *E = dyn_cast<Expr>(S)) {
+      Info.constantCodeCoverageEnter(E);
       if (E->isValueDependent()) {
         if (!EvaluateDependentExpr(E, Info))
           return ESR_Failed;
@@ -5547,6 +5555,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     return ESR_Failed;
 
   case Stmt::NullStmtClass:
+    Info.constantCodeCoverageEnter(S);
     return ESR_Succeeded;
 
   case Stmt::DeclStmtClass: {
@@ -5567,6 +5576,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
 
   case Stmt::ReturnStmtClass: {
     const Expr *RetExpr = cast<ReturnStmt>(S)->getRetValue();
+    Info.constantCodeCoverageEnter(RetExpr);
     FullExpressionRAII Scope(Info);
     if (RetExpr && RetExpr->isValueDependent()) {
       EvaluateDependentExpr(RetExpr, Info);
@@ -5585,6 +5595,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     BlockScopeRAII Scope(Info);
 
     const CompoundStmt *CS = cast<CompoundStmt>(S);
+    Info.constantCodeCoverageEnter(CS);
     for (const auto *BI : CS->body()) {
       EvalStmtResult ESR = EvaluateStmt(Result, Info, BI, Case);
       if (ESR == ESR_Succeeded)
@@ -5602,11 +5613,11 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
 
   case Stmt::IfStmtClass: {
     const IfStmt *IS = cast<IfStmt>(S);
-
     // Evaluate the condition, as either a var decl or as an expression.
     BlockScopeRAII Scope(Info);
     if (const Stmt *Init = IS->getInit()) {
       EvalStmtResult ESR = EvaluateStmt(Result, Info, Init);
+      Info.constantCodeCoverageEnter(Init);
       if (ESR != ESR_Succeeded) {
         if (ESR != ESR_Failed && !Scope.destroy())
           return ESR_Failed;
@@ -5620,11 +5631,14 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       // to true.
       if (!Info.InConstantContext)
         Cond = !Cond;
-    } else if (!EvaluateCond(Info, IS->getConditionVariable(), IS->getCond(),
+    } else {
+      if (!EvaluateCond(Info, IS->getConditionVariable(), IS->getCond(),
                              Cond))
       return ESR_Failed;
+    }
 
     if (const Stmt *SubStmt = Cond ? IS->getThen() : IS->getElse()) {
+      Info.constantCodeCoverageEnter(SubStmt);
       EvalStmtResult ESR = EvaluateStmt(Result, Info, SubStmt);
       if (ESR != ESR_Succeeded) {
         if (ESR != ESR_Failed && !Scope.destroy())

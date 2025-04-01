@@ -116,6 +116,7 @@ struct Counter {
 private:
   CounterKind Kind = Zero;
   unsigned ID = 0;
+  unsigned ConstantEvaluationCount = 0; // this is not evaluated, it's a hack to gather count to right places
 
   Counter(CounterKind Kind, unsigned ID) : Kind(Kind), ID(ID) {}
 
@@ -156,6 +157,14 @@ public:
   /// expression.
   static Counter getExpression(unsigned ExpressionId) {
     return Counter(Expression, ExpressionId);
+  }
+  
+  unsigned getConstantEvaluations() const {
+    return ConstantEvaluationCount;
+  }
+  
+  void setConstantEvaluations(unsigned Count) {
+    ConstantEvaluationCount = Count;
   }
 };
 

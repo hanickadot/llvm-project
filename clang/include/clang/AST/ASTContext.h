@@ -183,6 +183,11 @@ struct TypeInfoChars {
   }
 };
 
+struct CoverageBranching {
+  unsigned TrueBranchTaken;
+  unsigned FalseBranchTaken;
+};
+
 /// Holds long-lived AST nodes (such as types and decls) that can be
 /// referred to throughout the semantic analysis of a file.
 class ASTContext : public RefCountedBase<ASTContext> {
@@ -500,6 +505,11 @@ class ASTContext : public RefCountedBase<ASTContext> {
       ObjCSubClasses;
 
   ASTContext &this_() { return *this; }
+  
+  mutable llvm::DenseMap<const Stmt*, CoverageBranching> ConstantEvaluationCodeCoverageEntered;
+public:
+  void constantCodeCoverageEnter(const Stmt* stmt, bool Branch = true) const;
+  unsigned constantCodeCoverageCount(const Stmt* stmt, bool Branch = true) const;
 
 public:
   /// A type synonym for the TemplateOrInstantiation mapping.

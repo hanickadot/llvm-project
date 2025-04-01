@@ -21,6 +21,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/MD5.h"
 #include <optional>
+#include <iostream>
 
 namespace llvm {
 extern cl::opt<bool> EnableSingleByteCoverage;
@@ -1208,6 +1209,29 @@ void CodeGenPGO::emitCounterSetOrIncrement(CGBuilderTy &Builder, const Stmt *S,
   auto *NormalizedFuncNameVarPtr =
       llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
           FuncNameVar, llvm::PointerType::get(CGM.getLLVMContext(), 0));
+  
+  // TODO pass default coverage somehow
+  
+  // TODO why it attach counter to If Statement and not then block ... I don't know
+  if (auto * if_stmt = dyn_cast<IfStmt>(S)) {
+    S = if_stmt->getThen();
+  }
+  
+  unsigned ce = CGM.getContext().constantCodeCoverageCount(S);
+  //if (Counter == 1) {
+  //  __builtin_debugtrap();
+  //}
+  
+  for (auto [stmt, cntr]: *RegionCounterMap) {
+    std::cout << "- " << stmt << " -> " << cntr.Executed << "\n";
+  }
+  
+  if (ce) {
+    std::cout << "Known number of evaluation from compile time = " << ce << " ("<<FuncName<<"#"<<Counter<<")\n";
+    S->dump();
+  } else {
+    std::cout << "Unknown number of evaluation from compile time = " << ce << " ("<<FuncName<<"#"<<Counter<<", "<<S<<")\n";
+  }
 
   llvm::Value *Args[] = {
       NormalizedFuncNameVarPtr, Builder.getInt64(FunctionHash),

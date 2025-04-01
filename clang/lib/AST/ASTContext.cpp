@@ -97,6 +97,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <iostream>
 #include <utility>
 
 using namespace clang;
@@ -230,6 +231,35 @@ getDeclLocsForCommentSearch(const Decl *D, SourceManager &SourceMgr) {
   }
 
   return Locations;
+}
+
+void ASTContext::constantCodeCoverageEnter(const Stmt* stmt, bool Branch) const {
+  if (stmt != nullptr) {
+    std::cout << "Entering: " << stmt << "\n";
+    //stmt->dump();
+    //std::cout << "\n\n\n";
+    auto && [it, success] = (ConstantEvaluationCodeCoverageEntered.try_emplace(stmt, CoverageBranching{0u, 0u}));
+    if (Branch) {
+      ++it->second.TrueBranchTaken;
+    } else {
+      ++it->second.FalseBranchTaken;
+    }
+  }
+    
+}
+
+unsigned ASTContext::constantCodeCoverageCount(const Stmt* stmt, bool Branch) const {
+  auto it = ConstantEvaluationCodeCoverageEntered.find(stmt);
+ 
+  if (it == ConstantEvaluationCodeCoverageEntered.end()) {
+    return 0;
+  } else {
+    if (Branch) {
+      return it->second.TrueBranchTaken;
+    } else {
+      return it->second.FalseBranchTaken;
+    }
+  }
 }
 
 RawComment *ASTContext::getRawCommentForDeclNoCacheImpl(
