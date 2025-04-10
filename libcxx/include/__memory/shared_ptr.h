@@ -1052,9 +1052,22 @@ __allocate_shared_unbounded_array(const _Alloc& __a, size_t __n, _Arg&&... __arg
   // large enough to hold the control block and array. This allows shifting the
   // burden of aligning memory properly from us to the allocator.
   using _ControlBlock   = __unbounded_array_control_block<_Array, _Alloc>;
+#if _LIBCPP_STD_VER >= 26
   if (__libcpp_is_constant_evaluated()) {
-    return shared_ptr<_Array>(new _ControlBlock::__Tp[__n](std::forward<_Arg>(__arg)...));
+    auto __out = shared_ptr<_Array>(new _ControlBlock::__Tp[__n]);
+    auto * __ptr = __out.get();
+
+    auto __item_alloc = __allocator_traits_rebind_t<_Alloc, std::remove_reference_t<decltype(*__ptr)>>{__a};
+
+    if constexpr (sizeof...(_Arg) == 0) {
+       std::__uninitialized_allocator_value_construct_n_multidimensional(__item_alloc, __ptr, __n);
+    } else {
+      std::__uninitialized_allocator_fill_n_multidimensional(__item_alloc, __ptr, __n, std::forward<_Arg>(__arg)...);
+    }
+    
+    return __out;
   } else {
+#endif
     using _AlignedStorage = __sp_aligned_storage<alignof(_ControlBlock)>;
     using _StorageAlloc   = __allocator_traits_rebind_t<_Alloc, _AlignedStorage>;
     __allocation_guard<_StorageAlloc> __guard(__a, _ControlBlock::__bytes_for(__n) / sizeof(_AlignedStorage));
@@ -1062,7 +1075,9 @@ __allocate_shared_unbounded_array(const _Alloc& __a, size_t __n, _Arg&&... __arg
     std::__construct_at(__control_block, __a, __n, std::forward<_Arg>(__arg)...);
     __guard.__release_ptr();
     return shared_ptr<_Array>::__create_with_control_block(__control_block->__get_data(), __control_block);
+#if _LIBCPP_STD_VER >= 26
   }
+#endif
 }
 
 template <class _Tp, class _Alloc>
@@ -1123,9 +1138,13 @@ private:
   }
 
   _LIBCPP_NO_UNIQUE_ADDRESS _Alloc __alloc_;
+#if _LIBCPP_STD_VER >= 26
+  _Tp __data_[_Count];
+#else
   union {
     _Tp __data_[_Count];
   };
+#endif
 };
 
 template <typename> struct identify;
@@ -1134,20 +1153,14 @@ template <class _Array, class _Alloc, class... _Arg>
 constexpr _LIBCPP_HIDE_FROM_ABI shared_ptr<_Array> __allocate_shared_bounded_array(const _Alloc& __a, _Arg&&... __arg) {
   static_assert(__libcpp_is_bounded_array<_Array>::value);
   using _ControlBlock      = __bounded_array_control_block<_Array, _Alloc>;
-  if (__libcpp_is_constant_evaluated()) {
-    // in constant evaluation we just do two allocations
-    return shared_ptr<_Array>(new _ControlBlock::__Tp[_ControlBlock::__Count](std::forward<_Arg>(__arg)...));
-  } else {
-    
-    using _ControlBlockAlloc = __allocator_traits_rebind_t<_Alloc, _ControlBlock>;
+  using _ControlBlockAlloc = __allocator_traits_rebind_t<_Alloc, _ControlBlock>;
 
-    __allocation_guard<_ControlBlockAlloc> __guard(__a, 1);
- 
-    _ControlBlock* __control_block = std::addressof(*__guard.__get());
-    std::__construct_at(__control_block, __a, std::forward<_Arg>(__arg)...);
-    __guard.__release_ptr();
-    return shared_ptr<_Array>::__create_with_control_block(__control_block->__get_data(), __control_block);
-  }
+  __allocation_guard<_ControlBlockAlloc> __guard(__a, 1);
+
+  _ControlBlock* __control_block = std::addressof(*__guard.__get());
+  std::__construct_at(__control_block, __a, std::forward<_Arg>(__arg)...);
+  __guard.__release_ptr();
+  return shared_ptr<_Array>::__create_with_control_block(__control_block->__get_data(), __control_block);
 }
 
 #endif // _LIBCPP_STD_VER >= 17
