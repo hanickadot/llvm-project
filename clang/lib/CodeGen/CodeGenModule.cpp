@@ -72,6 +72,7 @@
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/TargetParser/X86TargetParser.h"
 #include "llvm/Transforms/Utils/BuildLibCalls.h"
+#include <iostream>
 #include <optional>
 #include <set>
 
@@ -7022,8 +7023,17 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
     return;
 
   // Consteval function shouldn't be emitted.
-  if (auto *FD = dyn_cast<FunctionDecl>(D); FD && FD->isImmediateFunction())
+  if (auto *FD = dyn_cast<FunctionDecl>(D); FD && FD->isImmediateFunction()) {
+    // even consteval functions needs code coverage emitted now
+    switch (D->getKind()) {
+    case Decl::CXXConversion:
+    case Decl::CXXMethod:
+    case Decl::Function:
+      AddDeferredUnusedCoverageMapping(D);
+    default:
+    }
     return;
+  }
 
   switch (D->getKind()) {
   case Decl::CXXConversion:
@@ -7042,6 +7052,10 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   case Decl::Var:
   case Decl::Decomposition:
   case Decl::VarTemplateSpecialization:
+    // TODO: emit coverage for expression
+    // if (auto *ND = dyn_cast<NamedDecl>(D)) {
+    //  std::cout << "emit global: " << std::string_view{ND->getName()} << "\n";
+    //}
     EmitGlobal(cast<VarDecl>(D));
     if (auto *DD = dyn_cast<DecompositionDecl>(D))
       for (auto *B : DD->flat_bindings())
