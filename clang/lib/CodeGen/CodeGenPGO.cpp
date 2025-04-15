@@ -47,6 +47,16 @@ void CodeGenPGO::setFuncName(StringRef Name,
     FuncNameVar = llvm::createPGOFuncNameVar(CGM.getModule(), Linkage, FuncName);
 }
 
+void CodeGenPGO::setFuncNameForUnEmitted(
+    StringRef Name, llvm::GlobalValue::LinkageTypes Linkage) {
+  setFuncName(Name, Linkage);
+  // Create PGOFuncName meta data.
+  if (FuncNameVar)
+    llvm::createPGOFuncNameMetadataAssociatedWith(*FuncNameVar, FuncName);
+
+  llvm::createPGOFuncNameVar(CGM.getModule(), Linkage, "tralala");
+}
+
 void CodeGenPGO::setFuncName(llvm::Function *Fn) {
   setFuncName(Fn->getName(), Fn->getLinkage());
   // Create PGOFuncName meta data.
@@ -1010,22 +1020,19 @@ uint64_t PGOHash::finalize() {
   return Result.low();
 }
 
-void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
+// Return false for early return
+static bool assignRegionCountersEligibility(CodeGenModule &CGM, GlobalDecl GD) {
   const Decl *D = GD.getDecl();
   if (!D->hasBody())
-    return;
+    return false;
 
   // Skip CUDA/HIP kernel launch stub functions.
   if (CGM.getLangOpts().CUDA && !CGM.getLangOpts().CUDAIsDevice &&
       D->hasAttr<CUDAGlobalAttr>())
-    return;
+    return false;
 
-  bool InstrumentRegions = CGM.getCodeGenOpts().hasProfileClangInstr();
-  llvm::IndexedInstrProfReader *PGOReader = CGM.getPGOReader();
-  if (!InstrumentRegions && !PGOReader)
-    return;
   if (D->isImplicit())
-    return;
+    return false;
   // Constructors and destructors may be represented by several functions in IR.
   // If so, instrument only base variant, others are implemented by delegation
   // to the base one, it would be counted twice otherwise.
@@ -1033,12 +1040,26 @@ void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
     if (const auto *CCD = dyn_cast<CXXConstructorDecl>(D))
       if (GD.getCtorType() != Ctor_Base &&
           CodeGenFunction::IsConstructorDelegationValid(CCD))
-        return;
+        return false;
   }
   if (isa<CXXDestructorDecl>(D) && GD.getDtorType() != Dtor_Base)
-    return;
+    return false;
 
   CGM.ClearUnusedCoverageMapping(D);
+  return true;
+}
+
+void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
+  const Decl *D = GD.getDecl();
+  llvm::IndexedInstrProfReader *PGOReader = CGM.getPGOReader();
+  bool InstrumentRegions = CGM.getCodeGenOpts().hasProfileClangInstr();
+
+  if (!InstrumentRegions && !PGOReader)
+    return;
+
+  if (!assignRegionCountersEligibility(CGM, GD))
+    return;
+
   if (Fn->hasFnAttribute(llvm::Attribute::NoProfile))
     return;
   if (Fn->hasFnAttribute(llvm::Attribute::SkipProfile))
@@ -1059,6 +1080,28 @@ void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
     computeRegionCounts(D);
     applyFunctionAttributes(PGOReader, Fn);
   }
+}
+
+void CodeGenPGO::assignRegionCountersForUnEmited(GlobalDecl GD) {
+  const Decl *D = GD.getDecl();
+
+  if (!assignRegionCountersEligibility(CGM, GD)) {
+    return;
+  }
+
+  SourceManager &SM = CGM.getContext().getSourceManager();
+  if (!llvm::coverage::SystemHeadersCoverage &&
+      SM.isInSystemHeader(D->getLocation()))
+    return;
+
+  StringRef Name = CGM.getMangledName(GD);
+  llvm::GlobalValue::LinkageTypes Linkage = CGM.getFunctionLinkage(GD);
+
+  setFuncNameForUnEmitted(Name, Linkage);
+
+  mapRegionCounters(D);
+  if (CGM.getCodeGenOpts().CoverageMapping)
+    emitCounterRegionMapping(D);
 }
 
 void CodeGenPGO::mapRegionCounters(const Decl *D) {

@@ -2637,13 +2637,14 @@ unsigned CoverageMappingModuleGen::getFileID(FileEntryRef File) {
   return FileEntries.try_emplace(File, FileEntries.size() + 1).first->second;
 }
 
-void CoverageMappingGen::emitCounterMapping(const Decl *D,
-                                            llvm::raw_ostream &OS) {
+unsigned CoverageMappingGen::emitCounterMapping(const Decl *D,
+                                                llvm::raw_ostream &OS) {
   assert(CounterMap && MCDCState);
   CounterCoverageMappingBuilder Walker(CVM, *CounterMap, *MCDCState, SM,
                                        LangOpts);
   Walker.VisitDecl(D);
   Walker.write(OS);
+  return Walker.Builder.count();
 }
 
 void CoverageMappingGen::emitEmptyMapping(const Decl *D,

@@ -7379,7 +7379,10 @@ void CodeGenModule::ClearUnusedCoverageMapping(const Decl *D) {
   DeferredEmptyCoverageMappingDecls.insert_or_assign(D, false);
 }
 
-void CodeGenModule::EmitDeferredUnusedCoverageMappings() {
+template <typename CB>
+static void EmitUnusedCoverageMapping(
+    llvm::MapVector<const Decl *, bool> &DeferredEmptyCoverageMappingDecls,
+    CB &&Emit) {
   // We call takeVector() here to avoid use-after-free.
   // FIXME: DeferredEmptyCoverageMappingDecls is getting mutated because
   // we deserialize function bodies to emit coverage info for them, and that
@@ -7393,30 +7396,39 @@ void CodeGenModule::EmitDeferredUnusedCoverageMappings() {
     case Decl::CXXMethod:
     case Decl::Function:
     case Decl::ObjCMethod: {
-      CodeGenPGO PGO(*this);
-      GlobalDecl GD(cast<FunctionDecl>(D));
-      PGO.emitEmptyCounterMapping(D, getMangledName(GD),
-                                  getFunctionLinkage(GD));
+      Emit(cast<clang::FunctionDecl>(D));
       break;
     }
     case Decl::CXXConstructor: {
-      CodeGenPGO PGO(*this);
-      GlobalDecl GD(cast<CXXConstructorDecl>(D), Ctor_Base);
-      PGO.emitEmptyCounterMapping(D, getMangledName(GD),
-                                  getFunctionLinkage(GD));
+      Emit(cast<clang::CXXConstructorDecl>(D));
       break;
     }
     case Decl::CXXDestructor: {
-      CodeGenPGO PGO(*this);
-      GlobalDecl GD(cast<CXXDestructorDecl>(D), Dtor_Base);
-      PGO.emitEmptyCounterMapping(D, getMangledName(GD),
-                                  getFunctionLinkage(GD));
+      Emit(cast<clang::CXXDestructorDecl>(D));
       break;
     }
     default:
       break;
     };
   }
+}
+
+void CodeGenModule::EmitDeferredUnusedCoverageMappings() {
+  // TODO fix me, once LLVM PGO pass will be able to accept this
+  const bool EmitConstexpr = CodeGenOpts.ConstexprCoverage && false;
+
+  auto EmitCoverage = [EmitConstexpr, this](auto *Declaration) {
+    CodeGenPGO PGO{*this};
+    GlobalDecl GD{Declaration};
+    if (EmitConstexpr && Declaration->isConstexpr()) {
+      PGO.assignRegionCountersForUnEmited(GD);
+    } else {
+      PGO.emitEmptyCounterMapping(Declaration, getMangledName(GD),
+                                  getFunctionLinkage(GD));
+    }
+  };
+
+  EmitUnusedCoverageMapping(DeferredEmptyCoverageMappingDecls, EmitCoverage);
 }
 
 void CodeGenModule::EmitMainVoidAlias() {

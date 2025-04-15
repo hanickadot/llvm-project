@@ -178,7 +178,8 @@ public:
   /// Emit the coverage mapping data which maps the regions of
   /// code to counters that will be used to find the execution
   /// counts for those regions.
-  void emitCounterMapping(const Decl *D, llvm::raw_ostream &OS);
+  /// Returns number of counters needed to be stored.
+  unsigned emitCounterMapping(const Decl *D, llvm::raw_ostream &OS);
 
   /// Emit the coverage mapping data for an unused function.
   /// It creates mapping regions with the counter of zero.

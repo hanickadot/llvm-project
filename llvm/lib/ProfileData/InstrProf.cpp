@@ -1429,6 +1429,11 @@ void createPGOFuncNameMetadata(Function &F, StringRef PGOFuncName) {
   return createPGONameMetadata(F, getPGOFuncNameMetadataName(), PGOFuncName);
 }
 
+void createPGOFuncNameMetadataAssociatedWith(GlobalObject &GO,
+                                             StringRef PGOName) {
+  return createPGONameMetadata(GO, getPGOFuncNameMetadataName(), PGOName);
+}
+
 void createPGONameMetadata(GlobalObject &GO, StringRef PGOName) {
   return createPGONameMetadata(GO, getPGONameMetadataName(), PGOName);
 }

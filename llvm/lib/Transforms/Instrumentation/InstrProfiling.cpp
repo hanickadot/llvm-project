@@ -57,6 +57,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <iostream>
 #include <string>
 
 using namespace llvm;
@@ -945,10 +946,16 @@ bool InstrLowerer::lower() {
   if (!ContainsProfiling && !CoverageNamesVar)
     return MadeChange;
 
+  // TODO go thru prefilled constexpr counter coverage and emit prefilled values
+  for (GlobalVariable &GV : M.globals()) {
+    std::cout << "Global variable: " << std::string_view{GV.getName()} << "\n";
+  }
+
   // We did not know how many value sites there would be inside
   // the instrumented function. This is counting the number of instrumented
   // target value sites to enter it as field in the profile data variable.
   for (Function &F : M) {
+    std::cout << "lowering: " << std::string_view{F.getName()} << "\n";
     InstrProfCntrInstBase *FirstProfInst = nullptr;
     for (BasicBlock &BB : F) {
       for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
@@ -970,6 +977,12 @@ bool InstrLowerer::lower() {
     if (FirstProfInst != nullptr) {
       static_cast<void>(getOrCreateRegionCounters(FirstProfInst));
     }
+  }
+
+  // TODO go thru all coverage variables, and if __profd_ and __profc_ were not
+  // emitted, emit custom
+  for (GlobalVariable &GV : M.globals()) {
+    std::cout << "After variable: " << std::string_view{GV.getName()} << "\n";
   }
 
   if (EnableVTableValueProfiling)

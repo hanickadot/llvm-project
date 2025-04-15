@@ -124,6 +124,15 @@ Counter CounterExpressionBuilder::simplify(Counter ExpressionTree) {
   return C;
 }
 
+unsigned CounterExpressionBuilder::count() const {
+  // FIXME: this is probably wrong :)
+  auto MaxId = [](unsigned MaxId, const auto &Expr) {
+    return std::max({MaxId, Expr.LHS.getCounterID(), Expr.RHS.getCounterID()});
+  };
+  return 1u +
+         std::accumulate(Expressions.begin(), Expressions.end(), 0u, MaxId);
+}
+
 Counter CounterExpressionBuilder::add(Counter LHS, Counter RHS, bool Simplify) {
   auto Cnt = get(CounterExpression(CounterExpression::Add, LHS, RHS));
   return Simplify ? simplify(Cnt) : Cnt;

@@ -83,6 +83,9 @@ public:
   /// generates global variables or associates PGO data with each of the
   /// counters depending on whether we are generating or using instrumentation.
   void assignRegionCounters(GlobalDecl GD, llvm::Function *Fn);
+
+  void assignRegionCountersForUnEmited(GlobalDecl GD);
+
   /// Emit a coverage mapping range with a counter zero
   /// for an unused declaration.
   void emitEmptyCounterMapping(const Decl *D, StringRef FuncName,
@@ -99,6 +102,8 @@ public:
 private:
   void setFuncName(llvm::Function *Fn);
   void setFuncName(StringRef Name, llvm::GlobalValue::LinkageTypes Linkage);
+  void setFuncNameForUnEmitted(StringRef Name,
+                               llvm::GlobalValue::LinkageTypes Linkage);
   void mapRegionCounters(const Decl *D);
   void computeRegionCounts(const Decl *D);
   void applyFunctionAttributes(llvm::IndexedInstrProfReader *PGOReader,

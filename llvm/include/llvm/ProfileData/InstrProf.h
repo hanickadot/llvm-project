@@ -316,6 +316,8 @@ std::string getPGOName(const GlobalVariable &V, bool InLTO = false);
 /// TODO: Update all callers to 'createPGONameMetadata' and deprecate this
 /// function.
 void createPGOFuncNameMetadata(Function &F, StringRef PGOFuncName);
+void createPGOFuncNameMetadataAssociatedWith(GlobalObject &GO,
+                                             StringRef PGOFuncName);
 
 /// Create the PGOName metadata if a global object's PGO name is different from
 /// its mangled name. This should apply to local-linkage global objects only.

@@ -209,6 +209,9 @@ class CounterExpressionBuilder {
 public:
   ArrayRef<CounterExpression> getExpressions() const { return Expressions; }
 
+  /// Return number of counters needed
+  unsigned count() const;
+
   /// Return a counter that represents the expression that adds LHS and RHS.
   Counter add(Counter LHS, Counter RHS, bool Simplify = true);
 
