@@ -40,6 +40,7 @@ static ArrayRef<options::ID> getUnsupportedOpts() {
       options::OPT_ftest_coverage,
       options::OPT_fno_test_coverage, // -f[no-]test-coverage
       options::OPT_fcoverage_mapping,
+      options::OPT_fconstexpr_coverage,
       options::OPT_fno_coverage_mapping, // -f[no-]coverage-mapping
       options::OPT_coverage,             // --coverage
       options::OPT_fprofile_instr_generate,

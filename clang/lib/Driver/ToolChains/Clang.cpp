@@ -689,8 +689,10 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, Compilation &C,
                       Args.hasArg(options::OPT_coverage);
   bool EmitCovData = TC.needsGCovInstrumentation(Args);
 
-  if (Args.hasFlag(options::OPT_fcoverage_mapping,
-                   options::OPT_fno_coverage_mapping, false)) {
+  bool CoverageMapping = Args.hasFlag(options::OPT_fcoverage_mapping,
+                                      options::OPT_fno_coverage_mapping, false);
+
+  if (CoverageMapping) {
     if (!ProfileGenerateArg)
       D.Diag(clang::diag::err_drv_argument_only_allowed_with)
           << "-fcoverage-mapping"
@@ -699,10 +701,19 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, Compilation &C,
     CmdArgs.push_back("-fcoverage-mapping");
   }
 
+  if (Args.hasFlag(options::OPT_fconstexpr_coverage,
+                   options::OPT_fno_constexpr_coverage, false)) {
+    if (!CoverageMapping)
+      D.Diag(clang::diag::err_drv_argument_only_allowed_with)
+          << "-fconstexpr-coverage"
+          << "-fcoverage-mapping";
+
+    CmdArgs.push_back("-fconstexpr-coverage");
+  }
+
   if (Args.hasFlag(options::OPT_fmcdc_coverage, options::OPT_fno_mcdc_coverage,
                    false)) {
-    if (!Args.hasFlag(options::OPT_fcoverage_mapping,
-                      options::OPT_fno_coverage_mapping, false))
+    if (!CoverageMapping)
       D.Diag(clang::diag::err_drv_argument_only_allowed_with)
           << "-fcoverage-mcdc"
           << "-fcoverage-mapping";

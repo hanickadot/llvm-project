@@ -7024,14 +7024,15 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
 
   // Consteval function shouldn't be emitted.
   if (auto *FD = dyn_cast<FunctionDecl>(D); FD && FD->isImmediateFunction()) {
-    // even consteval functions needs code coverage emitted now
-    switch (D->getKind()) {
-    case Decl::CXXConversion:
-    case Decl::CXXMethod:
-    case Decl::Function:
-      AddDeferredUnusedCoverageMapping(D);
-    default:
+    // But if have Constexpr Coverage Mapping enabled, we should emit counters
+    // anyway.
+    if (CodeGenOpts.CoverageMapping && CodeGenOpts.ConstexprCoverage) {
+      if (D->getKind() == Decl::CXXConversion ||
+          D->getKind() == Decl::CXXMethod || D->getKind() == Decl::Function)
+        // TODO maybe not deferred?
+        AddDeferredUnusedCoverageMapping(D);
     }
+
     return;
   }
 
