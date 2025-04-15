@@ -3653,6 +3653,14 @@ private:
   SmallVector<std::unique_ptr<OMPTraitInfo>, 4> OMPTraitInfoVector;
 
   llvm::DenseMap<GlobalDecl, llvm::StringSet<>> ThunksToBeAbbreviated;
+
+public:
+  using ConstexprCoverageType = llvm::DenseMap<const Stmt *, unsigned>;
+  void commitConstexprCoverage(const ConstexprCoverageType &uncommitted);
+  unsigned getConstexprVisitCount(const Stmt *) const;
+
+private:
+  ConstexprCoverageType ConstexprCounters;
 };
 
 /// Insertion operator for diagnostics.

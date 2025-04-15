@@ -14958,3 +14958,21 @@ bool ASTContext::useAbbreviatedThunkName(GlobalDecl VirtualMethodDecl,
   ThunksToBeAbbreviated[VirtualMethodDecl] = std::move(SimplifiedThunkNames);
   return Result;
 }
+
+void ASTContext::commitConstexprCoverage(
+    const ConstexprCoverageType &uncommitted) {
+  for (auto old : uncommitted) {
+    if (auto [it, ok] = ConstexprCounters.try_emplace(old.first, old.second);
+        !ok) {
+      it->second += old.second;
+    }
+  }
+}
+
+unsigned ASTContext::getConstexprVisitCount(const Stmt *stmt) const {
+  if (auto it = ConstexprCounters.find(stmt); it != ConstexprCounters.end()) {
+    return it->second;
+  } else {
+    return 0;
+  }
+}

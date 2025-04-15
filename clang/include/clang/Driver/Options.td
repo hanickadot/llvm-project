@@ -1746,7 +1746,7 @@ defm coverage_mapping : BoolFOption<"coverage-mapping",
   NegFlag<SetFalse, [], [ClangOption], "Disable code coverage analysis">, BothFlags<
           [], [ClangOption, CLOption]>>;
 defm constexpr_coverage
-    : BoolFOption<"constexpr-coverage", CodeGenOpts<"ConstexprCoverage">,
+    : BoolFOption<"constexpr-coverage", LangOpts<"ConstexprCoverage">,
                   DefaultFalse,
                   PosFlag<SetTrue, [], [ClangOption, CC1Option],
                           "Enable constant evaluated code coverage analysis">,

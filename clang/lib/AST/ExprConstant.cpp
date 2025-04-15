@@ -65,6 +65,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 #include <functional>
+#include <iostream>
 #include <optional>
 
 #define DEBUG_TYPE "exprconstant"
@@ -1007,6 +1008,9 @@ namespace {
       EM_IgnoreSideEffects,
     } EvalMode;
 
+    /// Constexpr Code Coverage
+    std::unique_ptr<ASTContext::ConstexprCoverageType> visitCount{nullptr};
+
     /// Are we checking whether the expression is a potential constant
     /// expression?
     bool checkingPotentialConstantExpression() const override  {
@@ -1030,7 +1034,11 @@ namespace {
                       /*CallExpr=*/nullptr, CallRef()),
           EvaluatingDecl((const ValueDecl *)nullptr),
           EvaluatingDeclValue(nullptr), HasActiveDiagnostic(false),
-          HasFoldFailureDiagnostic(false), EvalMode(Mode) {}
+          HasFoldFailureDiagnostic(false), EvalMode(Mode) {
+      if (C.getLangOpts().ConstexprCoverage) {
+        visitCount = std::make_unique<ASTContext::ConstexprCoverageType>();
+      }
+    }
 
     ~EvalInfo() {
       discardCleanups();
@@ -1185,6 +1193,22 @@ namespace {
       }
       CleanupStack.clear();
       return true;
+    }
+
+    void incrementVisit(const Stmt *stmt) {
+      if (visitCount) {
+        if (auto [it, inserted] = visitCount->try_emplace(stmt, 1u);
+            !inserted) {
+          ++it->second;
+        }
+      }
+    }
+
+    void commitConstexprCoverage() {
+      auto uncommitted = std::move(visitCount);
+      if (uncommitted) {
+        Ctx.commitConstexprCoverage(*uncommitted);
+      }
     }
 
   private:
@@ -5561,6 +5585,8 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       return ESR_CaseNotFound;
     }
   }
+
+  Info.incrementVisit(S);
 
   switch (S->getStmtClass()) {
   default:
@@ -16745,9 +16771,16 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   }
 
   // Check this core constant expression is a constant expression.
-  return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
-                                 ConstantExprKind::Normal) &&
-         CheckMemoryLeaks(Info);
+  if (!CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
+                               ConstantExprKind::Normal))
+    return false;
+
+  if (!CheckMemoryLeaks(Info))
+    return false;
+
+  Info.commitConstexprCoverage();
+
+  return true;
 }
 
 static bool FastEvaluateAsRValue(const Expr *Exp, Expr::EvalResult &Result,
@@ -17028,6 +17061,8 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
     return false;
   }
 
+  Info.commitConstexprCoverage();
+
   return true;
 }
 
@@ -17095,9 +17130,14 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
       llvm_unreachable("Unhandled cleanup; missing full expression marker?");
   }
 
-  return CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
-                                 ConstantExprKind::Normal) &&
-         CheckMemoryLeaks(Info);
+  if (!CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
+                               ConstantExprKind::Normal))
+    return false;
+  if (!CheckMemoryLeaks(Info))
+    return false;
+
+  Info.commitConstexprCoverage();
+  return true;
 }
 
 bool VarDecl::evaluateDestruction(
@@ -18057,7 +18097,13 @@ static bool EvaluateCharRangeAsStringImpl(const Expr *, T &Result,
       return false;
   }
 
-  return Scope.destroy() && CheckMemoryLeaks(Info);
+  if (!Scope.destroy())
+    return false;
+  if (!CheckMemoryLeaks(Info))
+    return false;
+
+  Info.commitConstexprCoverage();
+  return true;
 }
 
 bool Expr::EvaluateCharRangeAsString(std::string &Result,

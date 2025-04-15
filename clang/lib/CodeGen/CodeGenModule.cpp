@@ -7026,7 +7026,8 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   if (auto *FD = dyn_cast<FunctionDecl>(D); FD && FD->isImmediateFunction()) {
     // But if have Constexpr Coverage Mapping enabled, we should emit counters
     // anyway.
-    if (CodeGenOpts.CoverageMapping && CodeGenOpts.ConstexprCoverage) {
+    if (FD->isConstexpr() && CodeGenOpts.CoverageMapping &&
+        LangOpts.ConstexprCoverage) {
       if (D->getKind() == Decl::CXXConversion ||
           D->getKind() == Decl::CXXMethod || D->getKind() == Decl::Function)
         // TODO maybe not deferred?
@@ -7415,7 +7416,7 @@ static void EmitUnusedCoverageMapping(
 
 void CodeGenModule::EmitDeferredUnusedCoverageMappings() {
   // TODO fix me, once LLVM PGO pass will be able to accept this
-  const bool EmitConstexpr = CodeGenOpts.ConstexprCoverage && false;
+  const bool EmitConstexpr = LangOpts.ConstexprCoverage && false;
 
   auto EmitCoverage = [EmitConstexpr, this](auto *Declaration) {
     CodeGenPGO PGO{*this};
