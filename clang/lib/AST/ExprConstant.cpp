@@ -5586,8 +5586,6 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     }
   }
 
-  Info.incrementVisit(S);
-
   switch (S->getStmtClass()) {
   default:
     if (const Expr *E = dyn_cast<Expr>(S)) {
@@ -5647,6 +5645,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
 
   case Stmt::CompoundStmtClass: {
     BlockScopeRAII Scope(Info);
+    Info.incrementVisit(S);
 
     const CompoundStmt *CS = cast<CompoundStmt>(S);
     for (const auto *BI : CS->body()) {
@@ -5687,6 +5686,14 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     } else if (!EvaluateCond(Info, IS->getConditionVariable(), IS->getCond(),
                              Cond))
       return ESR_Failed;
+
+    // coverage is weird (depending on coverage mode, you need to mark different
+    // thing) currently only counter mode works, not bitmap
+    if (Cond) {
+      Info.incrementVisit(IS);
+    } else if (IS->getElse()) {
+      Info.incrementVisit(IS->getElse());
+    }
 
     if (const Stmt *SubStmt = Cond ? IS->getThen() : IS->getElse()) {
       EvalStmtResult ESR = EvaluateStmt(Result, Info, SubStmt);

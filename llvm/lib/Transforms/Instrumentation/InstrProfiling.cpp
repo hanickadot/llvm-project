@@ -1312,6 +1312,19 @@ void InstrLowerer::lowerMCDCTestVectorBitmapUpdate(
   Update->eraseFromParent();
 }
 
+static std::optional<std::string>
+getVarNameForConstexprCoverage(std::string_view Original,
+                               std::string_view Prefix,
+                               std::string_view NewPrefix) {
+  if (!(Original.size() >= Prefix.size() &&
+        Original.substr(0, Prefix.size()) == Prefix)) {
+    return std::nullopt;
+  }
+
+  Original.remove_prefix(Prefix.size());
+  return std::string{NewPrefix} + std::string{Original};
+}
+
 /// Get the name of a profiling variable for a particular function.
 static std::string getVarName(InstrProfInstBase *Inc, StringRef Prefix,
                               bool &Renamed) {
@@ -1686,9 +1699,33 @@ InstrLowerer::createRegionCounters(InstrProfCntrInstBase *Inc, StringRef Name,
                             Name);
     GV->setAlignment(Align(1));
   } else {
+    auto ConstexprCountersName = getVarNameForConstexprCoverage(
+        Name, getInstrProfCountersVarPrefix(), getInstrProfCounterVarPrefix());
+
+    GlobalVariable *CCGV = nullptr;
+    if (ConstexprCountersName) {
+      CCGV = M.getGlobalVariable(*ConstexprCountersName);
+    }
+
+    std::cout << "createRegionCounters: " << std::string_view{Name} << "\n";
+    Constant *counterInitializer = nullptr;
+    if (CCGV) {
+      auto *ConstexprCounterTy = CCGV->getInitializer()->getType();
+      if (auto *Arr = dyn_cast<ArrayType>(ConstexprCounterTy)) {
+        if (Arr->getNumElements() == NumCounters) {
+          std::cout << "FOUND!\n";
+
+          counterInitializer = CCGV->getInitializer();
+        }
+      }
+    }
     auto *CounterTy = ArrayType::get(Type::getInt64Ty(Ctx), NumCounters);
+    CounterTy->dump();
     GV = new GlobalVariable(M, CounterTy, false, Linkage,
-                            Constant::getNullValue(CounterTy), Name);
+                            (counterInitializer
+                                 ? counterInitializer
+                                 : Constant::getNullValue(CounterTy)),
+                            Name);
     GV->setAlignment(Align(8));
   }
   return GV;
