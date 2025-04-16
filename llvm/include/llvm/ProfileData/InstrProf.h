@@ -91,6 +91,9 @@ inline StringRef getInstrProfValueProfMemOpFuncName() {
 /// Return the name prefix of variables containing instrumented function names.
 inline StringRef getInstrProfNameVarPrefix() { return "__profn_"; }
 
+/// Return the name prefix of variables containing constexpr code coverage data.
+inline StringRef getInstrProfCounterVarPrefix() { return "__profce_"; }
+
 /// Return the name prefix of variables containing virtual table profile data.
 inline StringRef getInstrProfVTableVarPrefix() { return "__profvt_"; }
 
@@ -218,6 +221,9 @@ std::pair<StringRef, StringRef> getParsedIRPGOName(StringRef IRPGOName);
 std::string getPGOFuncNameVarName(StringRef FuncName,
                                   GlobalValue::LinkageTypes Linkage);
 
+std::string getPGOFuncCounterVarName(StringRef FuncName,
+                                     GlobalValue::LinkageTypes Linkage);
+
 /// Create and return the global variable for function name used in PGO
 /// instrumentation. \c FuncName is the IRPGO function name (returned by
 /// \c getIRPGOFuncName) for LLVM IR instrumentation and PGO function name
@@ -231,6 +237,11 @@ GlobalVariable *createPGOFuncNameVar(Function &F, StringRef PGOFuncName);
 GlobalVariable *createPGOFuncNameVar(Module &M,
                                      GlobalValue::LinkageTypes Linkage,
                                      StringRef PGOFuncName);
+
+GlobalVariable *
+createPGOFuncPrefilledCounters(Module &M, GlobalValue::LinkageTypes Linkage,
+                               StringRef PGOFuncNam,
+                               ArrayRef<uint64_t> Counters);
 
 /// Return the initializer in string of the PGO name var \c NameVar.
 StringRef getPGOFuncNameVarInitializer(GlobalVariable *NameVar);

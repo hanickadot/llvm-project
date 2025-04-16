@@ -2533,8 +2533,12 @@ void CoverageMappingModuleGen::addFunctionMappingRecord(
   const uint64_t NameHash = llvm::IndexedInstrProf::ComputeHash(NameValue);
   FunctionRecords.push_back({NameHash, FuncHash, CoverageMapping, IsUsed});
 
-  if (!IsUsed)
+  if (!IsUsed) {
     FunctionNames.push_back(NamePtr);
+    // TODO make sure counterptr is stored?
+    // if (CounterPtr)
+    //   FunctionNames.push_bakc(CounterPtr);
+  }
 
   if (CGM.getCodeGenOpts().DumpCoverageMapping) {
     // Dump the coverage mapping data for this function by decoding the

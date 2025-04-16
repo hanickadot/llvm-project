@@ -35,6 +35,15 @@ static llvm::cl::opt<bool>
 using namespace clang;
 using namespace CodeGen;
 
+void CodeGenPGO::emitConstexprCoverageForCurrentFunction(
+    ArrayRef<uint64_t> PrefilledCounterValues) {
+  if (!FuncName.empty() && FuncNameVar) {
+    llvm::createPGOFuncPrefilledCounters(CGM.getModule(),
+                                         FuncNameVar->getLinkage(), FuncName,
+                                         PrefilledCounterValues);
+  }
+}
+
 void CodeGenPGO::setFuncName(StringRef Name,
                              llvm::GlobalValue::LinkageTypes Linkage) {
   llvm::IndexedInstrProfReader *PGOReader = CGM.getPGOReader();
@@ -53,8 +62,6 @@ void CodeGenPGO::setFuncNameForUnEmitted(
   // Create PGOFuncName meta data.
   if (FuncNameVar)
     llvm::createPGOFuncNameMetadataAssociatedWith(*FuncNameVar, FuncName);
-
-  llvm::createPGOFuncNameVar(CGM.getModule(), Linkage, "tralala");
 }
 
 void CodeGenPGO::setFuncName(llvm::Function *Fn) {
@@ -1176,10 +1183,28 @@ void CodeGenPGO::emitCounterRegionMapping(const Decl *D) {
   CoverageMappingGen MappingGen(
       *CGM.getCoverageMapping(), CGM.getContext().getSourceManager(),
       CGM.getLangOpts(), RegionCounterMap.get(), RegionMCDCState.get());
-  MappingGen.emitCounterMapping(D, OS);
+  const unsigned Count = MappingGen.emitCounterMapping(D, OS);
 
   if (CoverageMapping.empty())
     return;
+
+  // This emits max value for each counter for all statements visited
+  // this global variable is then picked up by PGO pass and it will be copied to
+  // counter values.
+  if (CGM.getLangOpts().ConstexprCoverage && RegionCounterMap) {
+    const auto &regionCounters = *RegionCounterMap.get();
+    auto Values = std::vector<uint64_t>();
+    Values.resize(Count);
+
+    for (auto &&[stmt, counterPair] : regionCounters) {
+      uint32_t id = counterPair.Executed;
+      Values[id] = std::max(
+          Values[id],
+          static_cast<uint64_t>(CGM.getContext().getConstexprVisitCount(stmt)));
+    }
+
+    emitConstexprCoverageForCurrentFunction(Values);
+  }
 
   CGM.getCoverageMapping()->addFunctionMappingRecord(
       FuncNameVar, FuncName, FunctionHash, CoverageMapping);

@@ -437,6 +437,24 @@ std::string getPGOFuncNameVarName(StringRef FuncName,
   return VarName;
 }
 
+std::string getPGOFuncCounterVarName(StringRef FuncName,
+                                     GlobalValue::LinkageTypes Linkage) {
+  std::string VarName = std::string(getInstrProfCounterVarPrefix());
+  VarName += FuncName;
+
+  if (!GlobalValue::isLocalLinkage(Linkage))
+    return VarName;
+
+  // Now fix up illegal chars in local VarName that may upset the assembler.
+  const char InvalidChars[] = "-:;<>/\"'";
+  size_t FoundPos = VarName.find_first_of(InvalidChars);
+  while (FoundPos != std::string::npos) {
+    VarName[FoundPos] = '_';
+    FoundPos = VarName.find_first_of(InvalidChars, FoundPos + 1);
+  }
+  return VarName;
+}
+
 bool isGPUProfTarget(const Module &M) {
   const Triple &T = M.getTargetTriple();
   return T.isGPU();
@@ -477,6 +495,39 @@ GlobalVariable *createPGOFuncNameVar(Module &M,
 
   setPGOFuncVisibility(M, FuncNameVar);
   return FuncNameVar;
+}
+
+static std::vector<llvm::Constant *>
+ArrayOfConstexprCounterValues(ArrayRef<uint64_t> Values,
+                              llvm::LLVMContext &Ctx) {
+  std::vector<llvm::Constant *> Constants;
+  Constants.reserve(Values.size());
+
+  llvm::Type *Int64Ty = Type::getInt64Ty(Ctx);
+
+  // TODO transform
+  for (uint64_t v : Values) {
+    Constants.push_back(llvm::ConstantInt::get(Int64Ty, v));
+  }
+
+  return Constants;
+}
+
+GlobalVariable *
+createPGOFuncPrefilledCounters(Module &M, GlobalValue::LinkageTypes Linkage,
+                               StringRef PGOFuncName,
+                               ArrayRef<uint64_t> Counters) {
+  // TODO do something with linkage?
+  LLVMContext &Ctx = M.getContext();
+  auto *CounterArrayTy = ArrayType::get(Type::getInt64Ty(Ctx), Counters.size());
+  auto Constants = ArrayOfConstexprCounterValues(Counters, Ctx);
+
+  auto *GV =
+      new GlobalVariable(M, CounterArrayTy, false, Linkage,
+                         llvm::ConstantArray::get(CounterArrayTy, Constants),
+                         getPGOFuncCounterVarName(PGOFuncName, Linkage));
+  GV->setAlignment(Align(8));
+  return GV;
 }
 
 GlobalVariable *createPGOFuncNameVar(Function &F, StringRef PGOFuncName) {
@@ -1431,8 +1482,11 @@ void createPGOFuncNameMetadata(Function &F, StringRef PGOFuncName) {
 
 void createPGOFuncNameMetadataAssociatedWith(GlobalObject &GO,
                                              StringRef PGOName) {
-  return createPGONameMetadata(GO, getPGOFuncNameMetadataName(), PGOName);
+  createPGONameMetadata(GO, getPGOFuncNameMetadataName(), PGOName);
 }
+
+void createPGOFuncPrefiledCounters(GlobalObject &GO, StringRef PGOName,
+                                   ArrayRef<const uint64_t>) {}
 
 void createPGONameMetadata(GlobalObject &GO, StringRef PGOName) {
   return createPGONameMetadata(GO, getPGONameMetadataName(), PGOName);

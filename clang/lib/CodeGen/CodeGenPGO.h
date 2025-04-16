@@ -100,6 +100,8 @@ public:
   void setProfileVersion(llvm::Module &M);
 
 private:
+  void emitConstexprCoverageForCurrentFunction(
+      ArrayRef<uint64_t> PrefilledCounterValues);
   void setFuncName(llvm::Function *Fn);
   void setFuncName(StringRef Name, llvm::GlobalValue::LinkageTypes Linkage);
   void setFuncNameForUnEmitted(StringRef Name,
