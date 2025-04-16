@@ -1196,11 +1196,10 @@ namespace {
     }
 
     void incrementVisit(const Stmt *stmt) {
-      if (visitCount) {
-        if (auto [it, inserted] = visitCount->try_emplace(stmt, 1u);
-            !inserted) {
+      if (visitCount && (EvalMode == EM_ConstantExpression)) {
+
+        if (auto [it, inserted] = visitCount->try_emplace(stmt, 1u); !inserted)
           ++it->second;
-        }
       }
     }
 
@@ -5691,8 +5690,6 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     // thing) currently only counter mode works, not bitmap
     if (Cond) {
       Info.incrementVisit(IS);
-    } else if (IS->getElse()) {
-      Info.incrementVisit(IS->getElse());
     }
 
     if (const Stmt *SubStmt = Cond ? IS->getThen() : IS->getElse()) {

@@ -1682,6 +1682,29 @@ InstrLowerer::getOrCreateRegionBitmaps(InstrProfMCDCBitmapInstBase *Inc) {
   return PD.RegionBitmaps;
 }
 
+static Constant *getPrefilledCounters(Module &M, std::string_view Name,
+                                      unsigned ExpectedCount) {
+  auto ConstexprCountersName = getVarNameForConstexprCoverage(
+      Name, getInstrProfCountersVarPrefix(), getInstrProfCounterVarPrefix());
+
+  if (!ConstexprCountersName)
+    return nullptr;
+
+  GlobalVariable *CCGV = M.getGlobalVariable(*ConstexprCountersName);
+
+  if (!CCGV)
+    return nullptr;
+
+  auto *ConstexprCounterTy = CCGV->getInitializer()->getType();
+
+  auto *ArrTy = dyn_cast<ArrayType>(ConstexprCounterTy);
+
+  if (!ArrTy || ArrTy->getNumElements() != ExpectedCount)
+    return nullptr;
+
+  return CCGV->getInitializer();
+}
+
 GlobalVariable *
 InstrLowerer::createRegionCounters(InstrProfCntrInstBase *Inc, StringRef Name,
                                    GlobalValue::LinkageTypes Linkage) {
@@ -1699,33 +1722,15 @@ InstrLowerer::createRegionCounters(InstrProfCntrInstBase *Inc, StringRef Name,
                             Name);
     GV->setAlignment(Align(1));
   } else {
-    auto ConstexprCountersName = getVarNameForConstexprCoverage(
-        Name, getInstrProfCountersVarPrefix(), getInstrProfCounterVarPrefix());
-
-    GlobalVariable *CCGV = nullptr;
-    if (ConstexprCountersName) {
-      CCGV = M.getGlobalVariable(*ConstexprCountersName);
-    }
-
-    std::cout << "createRegionCounters: " << std::string_view{Name} << "\n";
-    Constant *counterInitializer = nullptr;
-    if (CCGV) {
-      auto *ConstexprCounterTy = CCGV->getInitializer()->getType();
-      if (auto *Arr = dyn_cast<ArrayType>(ConstexprCounterTy)) {
-        if (Arr->getNumElements() == NumCounters) {
-          std::cout << "FOUND!\n";
-
-          counterInitializer = CCGV->getInitializer();
-        }
-      }
-    }
+    // non-bitmap counters are able to be prefilled if it will find a symbol
+    // containing existing values (from constant evaluation of C++)
     auto *CounterTy = ArrayType::get(Type::getInt64Ty(Ctx), NumCounters);
-    CounterTy->dump();
-    GV = new GlobalVariable(M, CounterTy, false, Linkage,
-                            (counterInitializer
-                                 ? counterInitializer
-                                 : Constant::getNullValue(CounterTy)),
-                            Name);
+    Constant *CounterInit = getPrefilledCounters(M, Name, NumCounters);
+
+    if (!CounterInit)
+      CounterInit = Constant::getNullValue(CounterTy);
+
+    GV = new GlobalVariable(M, CounterTy, false, Linkage, CounterInit, Name);
     GV->setAlignment(Align(8));
   }
   return GV;
