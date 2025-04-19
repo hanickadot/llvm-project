@@ -7416,7 +7416,7 @@ static void EmitUnusedCoverageMapping(
 
 void CodeGenModule::EmitDeferredUnusedCoverageMappings() {
   // TODO fix me, once LLVM PGO pass will be able to accept this
-  const bool EmitConstexpr = LangOpts.ConstexprCoverage && false;
+  const bool EmitConstexpr = LangOpts.ConstexprCoverage;
 
   auto EmitCoverage = [EmitConstexpr, this](auto *Declaration) {
     CodeGenPGO PGO{*this};

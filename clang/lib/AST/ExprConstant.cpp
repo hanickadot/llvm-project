@@ -5714,6 +5714,8 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       if (!Continue)
         break;
 
+      Info.incrementVisit(WS);
+
       EvalStmtResult ESR = EvaluateLoopBody(Result, Info, WS->getBody());
       if (ESR != ESR_Continue) {
         if (ESR != ESR_Failed && !Scope.destroy())

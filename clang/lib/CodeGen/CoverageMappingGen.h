@@ -140,7 +140,7 @@ public:
                                 StringRef FunctionNameValue,
                                 uint64_t FunctionHash,
                                 const std::string &CoverageMapping,
-                                bool IsUsed = true);
+                                bool IsUsed = true, ArrayRef<uint64_t> CounterValues = {});
 
   /// Emit the coverage mapping data for a translation unit.
   void emit();

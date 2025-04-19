@@ -1173,6 +1173,8 @@ bool CodeGenPGO::skipRegionMappingForDecl(const Decl *D) {
   return !llvm::coverage::SystemHeadersCoverage && SM.isInSystemHeader(Loc);
 }
 
+#include <iostream>
+
 void CodeGenPGO::emitCounterRegionMapping(const Decl *D) {
   if (skipRegionMappingForDecl(D))
     return;
@@ -1183,7 +1185,7 @@ void CodeGenPGO::emitCounterRegionMapping(const Decl *D) {
   CoverageMappingGen MappingGen(
       *CGM.getCoverageMapping(), CGM.getContext().getSourceManager(),
       CGM.getLangOpts(), RegionCounterMap.get(), RegionMCDCState.get());
-  const unsigned Count = MappingGen.emitCounterMapping(D, OS);
+  MappingGen.emitCounterMapping(D, OS);
 
   if (CoverageMapping.empty())
     return;
@@ -1191,9 +1193,16 @@ void CodeGenPGO::emitCounterRegionMapping(const Decl *D) {
   // This emits max value for each counter for all statements visited
   // this global variable is then picked up by PGO pass and it will be copied to
   // counter values.
+
+  auto Values = std::vector<uint64_t>();
   if (CGM.getLangOpts().ConstexprCoverage && RegionCounterMap) {
     const auto &regionCounters = *RegionCounterMap.get();
-    auto Values = std::vector<uint64_t>();
+
+    size_t Count = 1;
+    for (auto &&[stmt, counterPair] : regionCounters) {
+      Count = std::max(static_cast<size_t>(counterPair.Executed + 1), Count);
+    }
+
     Values.resize(Count);
 
     for (auto &&[stmt, counterPair] : regionCounters) {
@@ -1207,7 +1216,7 @@ void CodeGenPGO::emitCounterRegionMapping(const Decl *D) {
   }
 
   CGM.getCoverageMapping()->addFunctionMappingRecord(
-      FuncNameVar, FuncName, FunctionHash, CoverageMapping);
+      FuncNameVar, FuncName, FunctionHash, CoverageMapping, true, Values);
 }
 
 void

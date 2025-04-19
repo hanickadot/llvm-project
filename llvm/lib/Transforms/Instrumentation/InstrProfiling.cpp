@@ -1699,6 +1699,9 @@ static Constant *getPrefilledCounters(Module &M, std::string_view Name,
 
   auto *ArrTy = dyn_cast<ArrayType>(ConstexprCounterTy);
 
+  assert(ArrTy != nullptr);
+  assert(ArrTy->getNumElements() == ExpectedCount);
+
   if (!ArrTy || ArrTy->getNumElements() != ExpectedCount)
     return nullptr;
 
