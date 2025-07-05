@@ -11968,6 +11968,23 @@ static const IntegerLiteral *getIntegerLiteral(Expr *E) {
   return IL;
 }
 
+static void DiagnoseFromBoolConversions(Sema &S, QualType T, Expr *E) {
+  E = E->IgnoreParenImpCasts();
+  SourceLocation ExprLoc = E->getExprLoc();
+
+  const Type *Target = S.Context.getCanonicalType(T).getTypePtr();
+  if (Target->isAnyCharacterType() &&
+      !Target->isExplicitlyQualifiedCharType()) {
+    if (S.LangOpts.CPlusPlus) {
+      S.Diag(ExprLoc, diag::warn_impcast_bool_to_character)
+          << T
+          << FixItHint::CreateInsertion(E->getBeginLoc(), "static_cast<bool>(")
+          << FixItHint::CreateInsertion(S.getLocForEndOfToken(E->getEndLoc()),
+                                        ")");
+    }
+  }
+}
+
 static void DiagnoseIntInBoolContext(Sema &S, Expr *E) {
   E = E->IgnoreParenImpCasts();
   SourceLocation ExprLoc = E->getExprLoc();
@@ -12433,6 +12450,9 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
 
   if (Target->isBooleanType())
     DiagnoseIntInBoolContext(*this, E);
+
+  if (Source->isBooleanType())
+    DiagnoseFromBoolConversions(*this, T, E);
 
   if (DiscardingCFIUncheckedCallee(QualType(Source, 0), QualType(Target, 0))) {
     Diag(CC, diag::warn_cast_discards_cfi_unchecked_callee)

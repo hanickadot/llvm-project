@@ -2527,6 +2527,8 @@ public:
   bool isAnyCharacterType() const;
   bool isUnicodeCharacterType() const;
   bool isIntegralType(const ASTContext &Ctx) const;
+  bool isExplicitlyQualifiedCharType() const;
+  bool isUnqualifiedCharType() const;
 
   /// Determine whether this type is an integral or enumeration type.
   bool isIntegralOrEnumerationType() const;

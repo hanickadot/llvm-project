@@ -2145,6 +2145,20 @@ bool Type::isCharType() const {
   return false;
 }
 
+bool Type::isExplicitlyQualifiedCharType() const {
+  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
+    return BT->getKind() == BuiltinType::UChar ||
+           BT->getKind() == BuiltinType::SChar;
+  return false;
+}
+
+bool Type::isUnqualifiedCharType() const {
+  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
+    return BT->getKind() == BuiltinType::Char_U ||
+           BT->getKind() == BuiltinType::Char_S;
+  return false;
+}
+
 bool Type::isWideCharType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() == BuiltinType::WChar_S ||

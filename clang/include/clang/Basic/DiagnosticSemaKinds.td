@@ -4348,6 +4348,9 @@ def warn_impcast_constant_value_to_objc_bool : Warning<
   "the only well defined values for 'BOOL' are YES and NO">,
   InGroup<ObjCBoolConstantConversion>;
 
+def warn_impcast_bool_to_character : Warning<
+  "implicit conversion from 'BOOL' to %0">, InGroup<Conversion>;
+
 def warn_impcast_fixed_point_range : Warning<
   "implicit conversion from %0 cannot fit within the range of values for %1">,
   InGroup<ImplicitFixedPointConversion>;
