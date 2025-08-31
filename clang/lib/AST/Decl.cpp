@@ -2490,6 +2490,10 @@ bool VarDecl::mightBeUsableInConstantExpressions(const ASTContext &C) const {
   return (Lang.CPlusPlus11 || Lang.C23) && isConstexpr();
 }
 
+bool VarDecl::isCxxPotentiallyConstantInitialized(const ASTContext &Context) const {
+  return this->mightBeUsableInConstantExpressions(Context) && !this->isConstexpr();
+}
+
 bool VarDecl::isUsableInConstantExpressions(const ASTContext &Context) const {
   // C++2a [expr.const]p3:
   //   A variable is usable in constant expressions after its initializing

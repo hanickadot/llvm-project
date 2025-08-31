@@ -1340,6 +1340,11 @@ public:
   /// "potentially-constant" variable.
   bool mightBeUsableInConstantExpressions(const ASTContext &C) const;
 
+  /// Determine whather this variable's initialization will be evaluated
+  /// according [expr.const] "potentially-constant" and if constant evaluation
+  /// succeed it will be upgraded to constexpr
+  bool isCxxPotentiallyConstantInitialized(const ASTContext &C) const;
+
   /// Determine whether this variable's value can be used in a
   /// constant expression, according to the relevant language standard,
   /// including checking whether it was initialized by a constant expression.

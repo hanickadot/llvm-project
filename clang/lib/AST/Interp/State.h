@@ -122,6 +122,9 @@ public:
   /// Whether or not we're in a context where the front end requires a
   /// constant value.
   bool InConstantContext = false;
+  
+  /// This evaluation is https://eel.is/c++draft/expr.const#8
+  bool CxxPotentiallyConstantInitialization = false;
 
 private:
   void addCallStack(unsigned Limit);

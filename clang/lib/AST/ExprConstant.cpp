@@ -5074,12 +5074,22 @@ static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
   if (InitE->isValueDependent())
     return false;
 
+  // we need to store the state, because here even constexpr variables can be reevaluated
+  // and if their value is used for const init, we can't use some exception helper functions.
+  const bool previousPotentialConstantInit = Info.CxxPotentiallyConstantInitialization;
+  Info.CxxPotentiallyConstantInitialization = VD->isCxxPotentiallyConstantInitialized(Info.Ctx);
+
   if (!EvaluateInPlace(Val, Info, Result, InitE)) {
     // Wipe out any partially-computed value, to allow tracking that this
     // evaluation failed.
     Val = APValue();
+    // restore state
+    Info.CxxPotentiallyConstantInitialization = previousPotentialConstantInit;
     return false;
   }
+  
+  // restore state
+  Info.CxxPotentiallyConstantInitialization = previousPotentialConstantInit;
 
   return true;
 }
@@ -13637,9 +13647,15 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     return Success(DidOverflow, E);
   }
   case Builtin::BI__constexpr_active_exceptions:
+    if (Info.CxxPotentiallyConstantInitialization) {
+      return false;
+    }
     //std::cout << "__constexpr_active_exceptions() -> " << Info.ActiveExceptions.size() << "\n";
     return Success(static_cast<int64_t>(Info.ActiveExceptions.size()), E);
   case Builtin::BI__constexpr_uncaught_exceptions:
+    if (Info.CxxPotentiallyConstantInitialization) {
+      return false;
+    }
     //std::cout << "__constexpr_uncaught_exceptions() -> " << Info.UncaughtExceptions.size() << "\n";
     return Success(static_cast<int64_t>(Info.UncaughtExceptions.size()), E);
   }
@@ -16712,6 +16728,7 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
                     : EvalInfo::EM_ConstantFold);
   Info.setEvaluatingDecl(VD, Value);
   Info.InConstantContext = IsConstantInitialization;
+  Info.CxxPotentiallyConstantInitialization = VD->isCxxPotentiallyConstantInitialized(Ctx);
 
   SourceLocation DeclLoc = VD->getLocation();
   QualType DeclTy = VD->getType();
