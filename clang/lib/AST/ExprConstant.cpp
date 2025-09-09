@@ -916,8 +916,32 @@ namespace {
       QualType type;
     };
     
+    struct ExceptionStateBackup {
+      std::stack<UnrollingExceptionT> UncaughtExceptions;
+      std::stack<UnrollingExceptionT> ActiveExceptions;
+    };
+    
     std::stack<UnrollingExceptionT> UncaughtExceptions;
     std::stack<UnrollingExceptionT> ActiveExceptions;
+    
+    std::optional<ExceptionStateBackup> backupExceptionStatus(bool needed) noexcept {
+      if (needed == false) {
+        return std::nullopt;
+      }
+      return ExceptionStateBackup{
+        std::move(this->UncaughtExceptions),
+        std::move(this->ActiveExceptions)
+      };
+    }
+    
+    void restoreExceptionStatus(std::optional<ExceptionStateBackup> && state) noexcept {
+      if (!state.has_value()) {
+        return;
+      }
+      this->UncaughtExceptions = std::move(state->UncaughtExceptions);
+      this->ActiveExceptions = std::move(state->ActiveExceptions);
+    }
+    
     bool MustTailCall{false};
     
     struct TailCallT {
@@ -5078,15 +5102,21 @@ static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
   // and if their value is used for const init, we can't use some exception helper functions.
   const bool previousPotentialConstantInit = Info.CxxPotentiallyConstantInitialization;
   Info.CxxPotentiallyConstantInitialization = VD->isCxxPotentiallyConstantInitialized(Info.Ctx) && previousPotentialConstantInit;
+  
+  auto exceptionState = Info.backupExceptionStatus(VD->isConstexpr());
 
   if (!EvaluateInPlace(Val, Info, Result, InitE)) {
     // Wipe out any partially-computed value, to allow tracking that this
     // evaluation failed.
+    
     Val = APValue();
     // restore state
     Info.CxxPotentiallyConstantInitialization = previousPotentialConstantInit;
+    Info.restoreExceptionStatus(std::move(exceptionState));
     return false;
   }
+  
+  Info.restoreExceptionStatus(std::move(exceptionState));
   
   // restore state
   Info.CxxPotentiallyConstantInitialization = previousPotentialConstantInit;
