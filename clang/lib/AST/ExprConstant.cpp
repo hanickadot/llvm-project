@@ -5077,7 +5077,7 @@ static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
   // we need to store the state, because here even constexpr variables can be reevaluated
   // and if their value is used for const init, we can't use some exception helper functions.
   const bool previousPotentialConstantInit = Info.CxxPotentiallyConstantInitialization;
-  Info.CxxPotentiallyConstantInitialization = VD->isCxxPotentiallyConstantInitialized(Info.Ctx);
+  Info.CxxPotentiallyConstantInitialization = VD->isCxxPotentiallyConstantInitialized(Info.Ctx) && previousPotentialConstantInit;
 
   if (!EvaluateInPlace(Val, Info, Result, InitE)) {
     // Wipe out any partially-computed value, to allow tracking that this
