@@ -5883,3 +5883,9 @@ def CountedByRef : Builtin {
   let Attributes = [NoThrow, CustomTypeChecking];
   let Prototype = "int(...)";
 }
+
+def PointerRelated : Builtin {
+  let Spellings = ["__builtin_pointers_related"];
+  let Attributes = [NoThrow, Consteval];
+  let Prototype = "bool(void const*, void const*)";
+}

@@ -601,6 +601,7 @@ set(files
   __memory/destruct_n.h
   __memory/inout_ptr.h
   __memory/is_sufficiently_aligned.h
+  __memory/is_pointer_between.h
   __memory/noexcept_move_assign_container.h
   __memory/out_ptr.h
   __memory/pointer_traits.h

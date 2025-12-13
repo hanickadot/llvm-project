@@ -1406,6 +1406,21 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   return true;
 }
 
+/// __builtin_pointers_related(Ptr, Ptr)
+static bool interp__builtin_pointers_related(InterpState &S, CodePtr OpPC,
+                                           const InterpFrame *Frame,
+                                           const CallExpr *Call) {
+  assert(Call->getNumArgs() == 2);
+  const Pointer &Second = S.Stk.pop<Pointer>();
+  const Pointer &First = S.Stk.pop<Pointer>();
+  if ((!First.isBlockPointer() && !First.isZero()) || (!Second.isBlockPointer() && !Second.isZero())) {
+    return false;
+  }
+  
+  S.Stk.push<Boolean>(Pointer::hasSameBase(First, Second));
+  return true;
+}
+
 /// (CarryIn, LHS, RHS, Result)
 static bool interp__builtin_ia32_addcarry_subborrow(InterpState &S,
                                                     CodePtr OpPC,
@@ -4968,6 +4983,9 @@ bool InterpretBuiltin(InterpState &S, CodePtr OpPC, const CallExpr *Call,
   case Builtin::BI__builtin_align_up:
   case Builtin::BI__builtin_align_down:
     return interp__builtin_is_aligned_up_down(S, OpPC, Frame, Call, BuiltinID);
+
+  case Builtin::BI__builtin_pointers_related:
+    return interp__builtin_pointers_related(S, OpPC, Frame, Call);
 
   case Builtin::BI__builtin_assume_aligned:
     return interp__builtin_assume_aligned(S, OpPC, Frame, Call);
