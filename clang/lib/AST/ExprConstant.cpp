@@ -15924,6 +15924,15 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   default:
     return false;
 
+  case Builtin::BI__builtin_pointers_related: {
+    LValue First, Second;
+    
+    if (!EvaluatePointer(E->getArg(0), First, Info, true) || !EvaluatePointer(E->getArg(1), Second, Info, true)) {
+      return false;
+    }
+    
+    return Success(HasSameBase(First, Second), E);
+  }
   case Builtin::BI__builtin_dynamic_object_size:
   case Builtin::BI__builtin_object_size: {
     // The type was checked when we built the expression.
