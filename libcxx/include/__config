@@ -282,6 +282,12 @@ typedef __char32_t char32_t;
 #  else
 #    define _LIBCPP_CONSTEXPR_SINCE_CXX26
 #  endif
+      
+#  if _LIBCPP_STD_VER >= 26
+#    define _LIBCPP_CONSTEXPR_BEFORE_AND_CONSTEVAL_SINCE_CXX26 consteval
+#  else
+#    define _LIBCPP_CONSTEXPR_BEFORE_AND_CONSTEVAL_SINCE_CXX26 constexpr
+#  endif
 
 // Thread API
 // clang-format off
