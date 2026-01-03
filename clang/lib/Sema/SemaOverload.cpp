@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TreeTransform.h"
 #include "CheckExprLifetime.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/CXXInheritance.h"
@@ -14879,6 +14880,46 @@ static QualType chooseRecoveryType(OverloadCandidateSet &CS,
   return Value;
 }
 
+class ArgsInlineTransform
+  : public TreeTransform<ArgsInlineTransform> {
+public:
+  using Base = TreeTransform<ArgsInlineTransform>;
+
+  ArgsInlineTransform(Sema &S)
+      : Base(S) {}
+
+  void addReplacement(const ParmVarDecl * Arg, Expr * Replacement) {
+    ParamToArg.insert({Arg, Replacement});
+  }
+  
+  ExprResult TransformLambdaExpr(LambdaExpr *LE) {
+    return ExprResult{LE};
+  }
+  DeclResult TransformFunctionDecl(FunctionDecl *FD) {
+    return DeclResult{FD};
+  }
+  DeclResult TransformCXXMethodDecl(CXXMethodDecl *MD) {
+    return DeclResult{MD};
+  }
+  DeclResult TransformCXXRecordDecl(CXXRecordDecl *RD) {
+    return DeclResult{RD};
+  }
+
+  ExprResult TransformDeclRefExpr(DeclRefExpr *DRE) {
+    if (auto *PVD = dyn_cast<ParmVarDecl>(DRE->getDecl())) {
+      auto It = ParamToArg.find(PVD);
+      if (It != ParamToArg.end()) {
+        // IMPORTANT: return a transformed COPY of the argument
+        return TransformExpr(It->second);
+      }
+    }
+    return Base::TransformDeclRefExpr(DRE);
+  }
+
+private:
+  llvm::DenseMap<const ParmVarDecl *, Expr *> ParamToArg{};
+};
+
 /// FinishOverloadedCallExpr - given an OverloadCandidateSet, builds and returns
 /// the completed call expression. If overload resolution fails, emits
 /// diagnostics and returns ExprError()
@@ -14895,6 +14936,66 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
   switch (OverloadResult) {
   case OR_Success: {
     FunctionDecl *FDecl = (*Best)->Function;
+    
+    if (FDecl->hasAttr<FunctionAliasAttr>()) {    
+      
+      // We will be substituting primary template, not instantiation
+      if (FunctionTemplateDecl *FTD = FDecl->getPrimaryTemplate()) {
+        FDecl = FTD->getTemplatedDecl();
+      }
+      if (FDecl->hasBody()) {
+        CompoundStmt * Body = dyn_cast<CompoundStmt>(FDecl->getBody());
+        
+        auto TmpArgs = MultiLevelTemplateArgumentList{};
+        auto parameters = FDecl->parameters();
+        
+        { // push instantiation context
+          Sema::InstantiatingTemplate Inst(SemaRef, Fn->getExprLoc(), FDecl);
+          if (Inst.isInvalid()) {
+            return ExprError();
+          }
+          
+          auto HanaInliner = ArgsInlineTransform(SemaRef);
+          assert(parameters.size() == Args.size());
+          for (size_t i = 0; i != parameters.size(); ++i) {
+            HanaInliner.addReplacement(parameters[i], Args[i]);
+          }
+          
+          if (Body->size() != 1) {
+            SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_be_just_return_inside_body) << FDecl << Body->getSourceRange();
+            return ExprError();
+          }
+        
+          Stmt * One = Body->body_back();
+         
+          if (ReturnStmt * RetStmt = dyn_cast<ReturnStmt>(One)) {
+            ExprResult Res = HanaInliner.TransformExpr(RetStmt->getRetValue());
+            if (!Res.isUsable()) {
+              SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_cannot_be_substituted) << FDecl << One->getSourceRange();
+              return ExprError();
+            } else {
+              return Res;
+            }
+          } else if (Expr * InlineE = dyn_cast<Expr>(One)) {
+            ExprResult Res = HanaInliner.TransformExpr(InlineE);
+            if (!Res.isUsable()) {
+              SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_cannot_be_substituted) << FDecl << One->getSourceRange();
+              return ExprError();
+            } else {
+              return Res;
+            }
+          } else {
+            SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_be_just_return_inside_body) << FDecl << Body->getSourceRange();
+            return ExprError();
+          }
+        }
+
+      } else {
+        SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_have_visible_body) << FDecl;
+        return ExprError();
+      }
+    }
+    
     SemaRef.CheckUnresolvedLookupAccess(ULE, (*Best)->FoundDecl);
     if (SemaRef.DiagnoseUseOfDecl(FDecl, ULE->getNameLoc()))
       return ExprError();
@@ -14902,6 +15003,8 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
         SemaRef.FixOverloadedFunctionReference(Fn, (*Best)->FoundDecl, FDecl);
     if (Res.isInvalid())
       return ExprError();
+   
+   
     return SemaRef.BuildResolvedCallExpr(
         Res.get(), FDecl, LParenLoc, Args, RParenLoc, ExecConfig,
         /*IsExecConfig=*/false,

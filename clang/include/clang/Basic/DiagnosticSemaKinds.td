@@ -4922,6 +4922,15 @@ def err_attribute_not_typedef_for_specialization
 def err_attribute_builtin_alias : Error<
   "%0 attribute can only be applied to a ARM, HLSL, SPIR-V or RISC-V builtin">;
 
+def err_functionalias_cannot_be_substituted : Error<
+  "function alias %0 can't be substituted (did you use explicit template parameters?)">;
+def err_functionalias_must_be_just_return_inside_body : Error<
+  "function alias %0 must have only a return statement in its body and nothing else">;
+def err_functionalias_must_be_just_one_substatement : Error<
+  "function alias %0 must be only one substatement">;
+def err_functionalias_must_have_visible_body : Error<
+  "function alias %0 must have visible body">;
+
 // called-once attribute diagnostics.
 def err_called_once_attribute_wrong_type : Error<
   "'called_once' attribute only applies to function-like parameters">;

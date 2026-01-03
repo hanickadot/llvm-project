@@ -2188,6 +2188,10 @@ static void handleStandardNoReturnAttr(Sema &S, Decl *D, const ParsedAttr &A) {
   D->addAttr(::new (S.Context) CXX11NoReturnAttr(S.Context, A));
 }
 
+static void handleStandardFunctionAliasAttr(Sema &S, Decl *D, const ParsedAttr &A) {
+  D->addAttr(::new (S.Context) FunctionAliasAttr(S.Context, A));
+}
+
 static void handleNoCfCheckAttr(Sema &S, Decl *D, const ParsedAttr &Attrs) {
   if (!S.getLangOpts().CFProtectionBranch)
     S.Diag(Attrs.getLoc(), diag::warn_nocf_check_attribute_ignored);
@@ -7837,6 +7841,9 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
     break;
   case ParsedAttr::AT_CXX11NoReturn:
     handleStandardNoReturnAttr(S, D, AL);
+    break;
+  case ParsedAttr::AT_FunctionAlias:
+    handleStandardFunctionAliasAttr(S, D, AL);
     break;
   case ParsedAttr::AT_AnyX86NoCfCheck:
     handleNoCfCheckAttr(S, D, AL);
