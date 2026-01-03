@@ -13772,6 +13772,9 @@ public:
 
   StmtResult SubstStmt(Stmt *S,
                        const MultiLevelTemplateArgumentList &TemplateArgs);
+  
+  // Hana's hack :)
+  StmtResult SubstParamReferencesWithExpr(Stmt * S, const MultiLevelTemplateArgumentList &TemplateArgs, llvm::function_ref<ExprResult(const DeclRefExpr * ref)> callback);
 
   ExprResult
   SubstInitializer(Expr *E, const MultiLevelTemplateArgumentList &TemplateArgs,

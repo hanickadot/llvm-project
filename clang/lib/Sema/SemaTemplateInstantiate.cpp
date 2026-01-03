@@ -1291,6 +1291,8 @@ namespace {
     // (recursively) by another function parameter.
     bool maybeInstantiateFunctionParameterToScope(ParmVarDecl *OldParm);
 
+    bool hasCallback = false;
+    llvm::function_ref<ExprResult(const DeclRefExpr * ref)> callback;
   public:
     typedef TreeTransform<TemplateInstantiator> inherited;
 
@@ -1318,6 +1320,16 @@ namespace {
         : inherited(SemaRef), TemplateArgs(TemplateArgs), Loc(Loc),
           BailOutOnIncomplete(false),
           BuildPackExpansionTypes(BuildPackExpansionTypes) {}
+
+    TemplateInstantiator(Sema &SemaRef, SourceLocation Loc,
+                         const MultiLevelTemplateArgumentList &TemplateArgs, 
+                         llvm::function_ref<ExprResult(const DeclRefExpr * ref)> callback)
+        : inherited{SemaRef}, 
+          TemplateArgs(TemplateArgs), 
+          Loc(Loc), 
+          BailOutOnIncomplete(false),
+          hasCallback(true), 
+          callback(callback) { }
 
     /// Determine whether the given type \p T has already been
     /// transformed.
@@ -2318,6 +2330,13 @@ TemplateInstantiator::TransformFunctionParmPackRefExpr(DeclRefExpr *E,
 
 ExprResult
 TemplateInstantiator::TransformDeclRefExpr(DeclRefExpr *E) {
+  if (hasCallback) {
+    if (auto Replacement = callback(E); Replacement.isUsable()) {
+      return Replacement;
+    }
+  }
+  
+  
   NamedDecl *D = E->getDecl();
 
   // Handle references to non-type template parameters and non-type template
@@ -4316,6 +4335,16 @@ Sema::SubstStmt(Stmt *S, const MultiLevelTemplateArgumentList &TemplateArgs) {
   TemplateInstantiator Instantiator(*this, TemplateArgs,
                                     SourceLocation(),
                                     DeclarationName());
+  return Instantiator.TransformStmt(S);
+}
+
+StmtResult
+Sema::SubstParamReferencesWithExpr(Stmt * S, const MultiLevelTemplateArgumentList &TemplateArgs, llvm::function_ref<ExprResult(const DeclRefExpr * ref)> callback) {
+  if (!S)
+    return S;
+  
+  TemplateInstantiator Instantiator(*this, SourceLocation(),TemplateArgs,  callback);
+  
   return Instantiator.TransformStmt(S);
 }
 

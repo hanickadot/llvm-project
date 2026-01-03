@@ -14743,6 +14743,67 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
         SemaRef.FixOverloadedFunctionReference(Fn, (*Best)->FoundDecl, FDecl);
     if (Res.isInvalid())
       return ExprError();
+    
+    if (FDecl->hasAttr<FunctionAliasAttr>()) {    
+      
+      // We will be substituting primary template, not instantiation
+      if (FunctionTemplateDecl *FTD = FDecl->getPrimaryTemplate()) {
+        FDecl = FTD->getTemplatedDecl();
+      }
+      if (FDecl->hasBody()) {
+        CompoundStmt * Body = dyn_cast<CompoundStmt>(FDecl->getBody());
+        
+        auto TmpArgs = MultiLevelTemplateArgumentList{};
+        auto parameters = FDecl->parameters();
+        
+        { // push instantiation context
+          Sema::InstantiatingTemplate Inst(SemaRef, Fn->getExprLoc(), FDecl);
+          if (Inst.isInvalid()) {
+            return ExprError();
+          }
+          
+          if (Body->size() != 1) {
+            SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_be_just_return_inside_body) << FDecl << Body->getSourceRange();
+            return ExprError();
+          }
+        
+          ReturnStmt * RetStmt = dyn_cast<ReturnStmt>(Body->body_back());
+        
+          if (RetStmt == nullptr) {
+            SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_be_just_return_inside_body) << FDecl << Body->getSourceRange();
+            return ExprError();
+          }
+          
+          StmtResult Res = SemaRef.SubstParamReferencesWithExpr(Body, TmpArgs, [&](const DeclRefExpr * ref) -> ExprResult {
+            if (ref) {
+              const auto AssociatedParam = std::find(parameters.begin(), parameters.end(), ref->getDecl());
+              const size_t Index = AssociatedParam - parameters.begin();
+              assert(Index < Args.size());
+              return ExprResult(Args[Index]);
+            }
+            return ExprError();
+          });
+        
+          if (!Res.isUsable()) {
+            SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_cannot_be_substituted) << FDecl << Body->getSourceRange();
+            return ExprError();
+          }
+          
+          Body = dyn_cast<CompoundStmt>(Res.get());
+        }
+        
+        assert(Body && Body->size() == 1);
+        ReturnStmt * RetStmt = dyn_cast<ReturnStmt>(Body->body_back());
+        assert(RetStmt != nullptr);
+        return ExprResult(RetStmt->getRetValue());
+    
+      } else {
+        SemaRef.Diag(Fn->getExprLoc(), diag::err_functionalias_must_have_visible_body) << FDecl;
+        return ExprError();
+      }
+    }
+   
+   
     return SemaRef.BuildResolvedCallExpr(
         Res.get(), FDecl, LParenLoc, Args, RParenLoc, ExecConfig,
         /*IsExecConfig=*/false,
