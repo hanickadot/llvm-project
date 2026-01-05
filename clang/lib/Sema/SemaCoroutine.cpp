@@ -1728,19 +1728,7 @@ bool CoroutineStmtBuilder::makeOnFallthrough() {
       lookupMember(S, "return_value", PromiseRecordDecl, Loc, HasRValue);
 
   StmtResult Fallthrough;
-  if (HasRVoid && HasRValue) {
-    // FIXME Improve this diagnostic
-    S.Diag(FD.getLocation(),
-           diag::err_coroutine_promise_incompatible_return_functions)
-        << PromiseRecordDecl;
-    S.Diag(LRVoid.getRepresentativeDecl()->getLocation(),
-           diag::note_member_first_declared_here)
-        << LRVoid.getLookupName();
-    S.Diag(LRValue.getRepresentativeDecl()->getLocation(),
-           diag::note_member_first_declared_here)
-        << LRValue.getLookupName();
-    return false;
-  } else if (!HasRVoid && !HasRValue) {
+  if (!HasRVoid && !HasRValue) {
     // We need to set 'Fallthrough'. Otherwise the other analysis part might
     // think the coroutine has defined a return_value method. So it might emit
     // **false** positive warning. e.g.,
@@ -1754,7 +1742,8 @@ bool CoroutineStmtBuilder::makeOnFallthrough() {
     Fallthrough = S.ActOnNullStmt(PromiseRecordDecl->getLocation());
     if (Fallthrough.isInvalid())
       return false;
-  } else if (HasRVoid) {
+  }
+  if (HasRVoid) {
     Fallthrough = S.BuildCoreturnStmt(FD.getLocation(), nullptr,
                                       /*IsImplicit=*/true);
     Fallthrough = S.ActOnFinishFullStmt(Fallthrough.get());
