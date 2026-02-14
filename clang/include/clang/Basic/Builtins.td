@@ -5889,3 +5889,40 @@ def PointerRelated : Builtin {
   let Attributes = [NoThrow, Consteval];
   let Prototype = "bool(void const*, void const*)";
 }
+
+// support for pointer tagging
+// (ptr & mask) | (val & ~mask)
+def TagPointerMaskOr : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask_or"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t, size_t)";
+}
+
+// (ptr & mask) -> void *
+def TagPointerMask : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t)";
+}
+
+// (ptr & mask) -> uintptr_t
+def TagPointerMaskAsInt : Builtin {
+  let Spellings = ["__builtin_tag_pointer_mask_as_int"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "size_t(void*, size_t)";
+}
+
+// (ptr << shift) | (value & ~mask) -> void *
+// mask = (1 << shift) - 1
+def TagPointerShiftOr : Builtin {
+  let Spellings = ["__builtin_tag_pointer_shift_or"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t, size_t)";
+}
+
+// (ptr >> unshift) -> void *
+def TagPointerUnshift : Builtin {
+  let Spellings = ["__builtin_tag_pointer_unshift"];
+  let Attributes = [Constexpr, NoThrow];
+  let Prototype = "void*(void*, size_t)";
+}

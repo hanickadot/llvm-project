@@ -4775,6 +4775,12 @@ public:
                                bool IsPop);
   RValue emitStdcFirstBit(const CallExpr *E, llvm::Intrinsic::ID IntID,
                           bool InvertArg);
+  /// Emit IR for pointer tagging
+  RValue EmitBuiltinTagPointerMaskOr(const CallExpr *E);
+  RValue EmitBuiltinTagPointerMask(const CallExpr *E);
+  RValue EmitBuiltinTagPointerMaskAsInt(const CallExpr *E);
+  RValue EmitBuiltinTagPointerShiftOr(const CallExpr *E);
+  RValue EmitBuiltinTagPointerUnshift(const CallExpr *E);
 
   /// Emit IR for __builtin_os_log_format.
   RValue emitBuiltinOSLogFormat(const CallExpr &E);
