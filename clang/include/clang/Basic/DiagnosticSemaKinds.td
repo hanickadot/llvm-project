@@ -4547,6 +4547,10 @@ def warn_impcast_constant_value_to_objc_bool : Warning<
   "the only well defined values for 'BOOL' are YES and NO">,
   InGroup<ObjCBoolConstantConversion>;
 
+def warn_integer_promotion_changing_signedness_in_binop : Warning<
+  "integer promotion changing signedness in expression %0 %1 %2 yielding %3">, 
+  InGroup<SignConversion>, DefaultIgnore;
+
 def warn_impcast_fixed_point_range : Warning<
   "implicit conversion from %0 cannot fit within the range of values for %1">,
   InGroup<ImplicitFixedPointConversion>;

@@ -15734,8 +15734,19 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
     if (ConvertHalfVec)
       return convertHalfVecBinOp(*this, LHS, RHS, Opc, ResultTy, VK, OK, false,
                                  OpLoc, CurFPFeatureOverrides());
-    return BinaryOperator::Create(Context, LHS.get(), RHS.get(), Opc, ResultTy,
-                                  VK, OK, OpLoc, CurFPFeatureOverrides());
+    Expr * Out = BinaryOperator::Create(Context, LHS.get(), RHS.get(), Opc, ResultTy,
+                                                               VK, OK, OpLoc, CurFPFeatureOverrides());          
+    if (LHSExpr->getType()->isIntegerType() && RHSExpr->getType()->isIntegerType()) {
+      if (ResultTy != LHSExpr->getType() && ResultTy != RHSExpr->getType()) {
+        if (ResultTy->isSignedIntegerType()) {
+          if (LHSExpr->getType()->isUnsignedIntegerType() || RHSExpr->getType()->isUnsignedIntegerType()) {
+            Diag(Out->getExprLoc(), diag::warn_integer_promotion_changing_signedness_in_binop) << Out->getSourceRange() << LHSExpr->getType() << BinaryOperator::getOpcodeStr(Opc) << RHSExpr->getType() << ResultTy;
+          }
+        }
+      }
+    }
+    return Out;
+    
   }
 
   // Handle compound assignments.
