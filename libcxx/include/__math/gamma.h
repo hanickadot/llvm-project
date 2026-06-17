@@ -12,6 +12,7 @@
 #include <__config>
 #include <__type_traits/enable_if.h>
 #include <__type_traits/is_integral.h>
+#include <__type_traits/is_constant_evaluated.h>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header
@@ -23,17 +24,17 @@ namespace __math {
 
 // lgamma
 
-inline _LIBCPP_HIDE_FROM_ABI float lgamma(float __x) _NOEXCEPT { return __builtin_lgammaf(__x); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 float lgamma(float __x) _NOEXCEPT { return __builtin_lgammaf(__x); }
 
 template <class = int>
-_LIBCPP_HIDE_FROM_ABI double lgamma(double __x) _NOEXCEPT {
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double lgamma(double __x) _NOEXCEPT {
   return __builtin_lgamma(__x);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI long double lgamma(long double __x) _NOEXCEPT { return __builtin_lgammal(__x); }
+inline _LIBCPP_HIDE_FROM_ABI  _LIBCPP_CONSTEXPR_SINCE_CXX23 long double lgamma(long double __x) _NOEXCEPT { return __builtin_lgammal(__x); }
 
 template <class _A1, __enable_if_t<is_integral<_A1>::value, int> = 0>
-inline _LIBCPP_HIDE_FROM_ABI double lgamma(_A1 __x) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double lgamma(_A1 __x) _NOEXCEPT {
   return __builtin_lgamma((double)__x);
 }
 
@@ -41,17 +42,17 @@ inline _LIBCPP_HIDE_FROM_ABI double lgamma(_A1 __x) _NOEXCEPT {
 
 // tgamma
 
-inline _LIBCPP_HIDE_FROM_ABI float tgamma(float __x) _NOEXCEPT { return __builtin_tgammaf(__x); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 float tgamma(float __x) _NOEXCEPT { return __builtin_tgammaf(__x); }
 
 template <class = int>
-_LIBCPP_HIDE_FROM_ABI double tgamma(double __x) _NOEXCEPT {
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double tgamma(double __x) _NOEXCEPT {
   return __builtin_tgamma(__x);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI long double tgamma(long double __x) _NOEXCEPT { return __builtin_tgammal(__x); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 long double tgamma(long double __x) _NOEXCEPT { return __builtin_tgammal(__x); }
 
 template <class _A1, __enable_if_t<is_integral<_A1>::value, int> = 0>
-inline _LIBCPP_HIDE_FROM_ABI double tgamma(_A1 __x) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double tgamma(_A1 __x) _NOEXCEPT {
   return __builtin_tgamma((double)__x);
 }
 
@@ -64,7 +65,7 @@ inline _LIBCPP_HIDE_FROM_ABI double tgamma(_A1 __x) _NOEXCEPT {
 
 #if defined(_LIBCPP_MSVCRT_LIKE) // reentrant version is not available on Windows
 
-inline _LIBCPP_HIDE_FROM_ABI double __lgamma_r(double __d) _NOEXCEPT { return __builtin_lgamma(__d); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double __lgamma_r(double __d) _NOEXCEPT { return __builtin_lgamma(__d); }
 
 #else
 
@@ -74,9 +75,13 @@ double __lgamma_r_shim(double, int*) _NOEXCEPT __asm__("_lgamma_r");
 double __lgamma_r_shim(double, int*) _NOEXCEPT __asm__("lgamma_r");
 #  endif
 
-inline _LIBCPP_HIDE_FROM_ABI double __lgamma_r(double __d) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double __lgamma_r(double __d) _NOEXCEPT {
   int __sign;
-  return __math::__lgamma_r_shim(__d, &__sign);
+  if (__libcpp_is_constant_evaluated()) {
+    return __builtin_lgamma(__d);
+  } else {
+    return __math::__lgamma_r_shim(__d, &__sign);
+  }
 }
 
 #endif

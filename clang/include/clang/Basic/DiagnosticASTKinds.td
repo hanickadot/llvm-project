@@ -16,6 +16,8 @@ def note_constexpr_invalid_cast : Note<
   "of a reinterpret_cast}1}|%CastFrom{cast from %1}}0"
   " is not allowed in a constant expression"
   "%select{| in C++ standards before C++20||}0">;
+def node_constexpr_builtin_is_not_constexpr : Note<
+  "builtin '%0' (%1) is not supported during constant evaluation">;
 def note_constexpr_invalid_void_star_cast : Note<
   "cast from %0 is not allowed in a constant expression "
   "%select{in C++ standards before C++2c|because the pointed object "
@@ -80,6 +82,8 @@ def note_constexpr_subobject_declared_here : Note<
 def note_constexpr_array_index : Note<"cannot refer to element %0 of "
   "%select{array of %2 element%plural{1:|:s}2|non-array object}1 "
   "in a constant expression">;
+def node_constexpr_failed_float_builtin : Note<
+  "float builtin '%0' failed to evaluate">;
 def note_constexpr_float_arithmetic : Note<
   "floating point arithmetic produces %select{an infinity|a NaN}0">;
 def note_constexpr_dynamic_rounding : Note<

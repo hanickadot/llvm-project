@@ -23,23 +23,23 @@ namespace __math {
 
 // sqrt
 
-inline _LIBCPP_HIDE_FROM_ABI float sqrt(float __x) _NOEXCEPT { return __builtin_sqrtf(__x); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 float sqrt(float __x) _NOEXCEPT { return __builtin_sqrtf(__x); }
 
 template <class = int>
-_LIBCPP_HIDE_FROM_ABI double sqrt(double __x) _NOEXCEPT {
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double sqrt(double __x) _NOEXCEPT {
   return __builtin_sqrt(__x);
 }
 
-inline _LIBCPP_HIDE_FROM_ABI long double sqrt(long double __x) _NOEXCEPT { return __builtin_sqrtl(__x); }
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 long double sqrt(long double __x) _NOEXCEPT { return __builtin_sqrtl(__x); }
 
 template <class _A1, __enable_if_t<is_integral<_A1>::value, int> = 0>
-inline _LIBCPP_HIDE_FROM_ABI double sqrt(_A1 __x) _NOEXCEPT {
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX23 double sqrt(_A1 __x) _NOEXCEPT {
   return __builtin_sqrt((double)__x);
 }
 
 // cbrt
 
-[[__nodiscard__]] inline _LIBCPP_HIDE_FROM_ABI float cbrt(float __x) _NOEXCEPT { return __builtin_cbrtf(__x); }
+[[__nodiscard__]] inline _LIBCPP_HIDE_FROM_ABI  float cbrt(float __x) _NOEXCEPT { return __builtin_cbrtf(__x); }
 
 template <class = int>
 [[__nodiscard__]] _LIBCPP_HIDE_FROM_ABI double cbrt(double __x) _NOEXCEPT {

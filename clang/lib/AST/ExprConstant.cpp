@@ -19916,6 +19916,70 @@ static bool EvaluateFloat(const Expr* E, APFloat& Result, EvalInfo &Info) {
   return FloatExprEvaluator(Info, Result).Visit(E);
 }
 
+template <typename Float, typename Double, typename LongDouble> struct FloatCall {
+  Float floatOp;
+  Double doubleOp;
+  LongDouble longDoubleOp;
+  template <typename T> T operator()(T value) const noexcept {
+    if constexpr (std::is_same_v<T, float>) {
+      return floatOp(value);
+    } else if constexpr (std::is_same_v<T, double>) {
+      return doubleOp(value);
+    } else  {
+      static_assert(std::is_same_v<T, long double>);
+      return longDoubleOp(value);
+    }
+  }
+  template <typename T> T operator()(T first, llvm::type_identity_t<T> second) const noexcept {
+    if constexpr (std::is_same_v<T, float>) {
+      return floatOp(first, second);
+    } else if constexpr (std::is_same_v<T, double>) {
+      return doubleOp(first, second);
+    } else  {
+      static_assert(std::is_same_v<T, long double>);
+      return longDoubleOp(first, second);
+    }
+  }
+};
+
+template <typename A, typename B, typename C> FloatCall(A, B, C) -> FloatCall<A, B, C>;
+
+template <typename Op> static bool TryEvaluateAndApplyUnaryOnFloat(EvalInfo &Info, const Op & op, const CallExpr * CE, QualType ResultTy, llvm::APFloat &Result) {
+  // I know it doesn't follow semantic as rest of float stuff
+  // but it's already standardized, so it's not part of my proposal
+  const llvm::fltSemantics &Sem = Info.Ctx.getFloatTypeSemantics(ResultTy);
+  APFloat ArgResult{Sem};
+  if (!EvaluateFloat(CE->getArg(0), ArgResult, Info)) {
+    const NamedDecl * ND = dyn_cast<NamedDecl>(CE->getCalleeDecl());
+    Info.FFDiag(CE, diag::node_constexpr_failed_float_builtin) << (ND ? ND->getDeclName().getAsString() : "unknown");
+    return false;
+  }
+
+  Result = APFloat(op(ArgResult.convertToDouble()));
+  return true;
+}
+
+template <typename Op> static bool TryEvaluateAndApplyBinaryOnFloat(EvalInfo &Info, const Op & op, const CallExpr * CE, QualType ResultTy, llvm::APFloat &Result) {
+  // I know it doesn't follow semantic as rest of float stuff
+  // but it's already standardized, so it's not part of my proposal
+  const llvm::fltSemantics &Sem = Info.Ctx.getFloatTypeSemantics(ResultTy);
+  APFloat First{Sem};
+  if (!EvaluateFloat(CE->getArg(0), First, Info)) {
+    const NamedDecl * ND = dyn_cast<NamedDecl>(CE->getCalleeDecl());
+    Info.FFDiag(CE, diag::node_constexpr_failed_float_builtin) << (ND ? ND->getDeclName().getAsString() : "unknown");
+    return false;
+  }
+  APFloat Second{Sem};
+  if (!EvaluateFloat(CE->getArg(1), Second, Info)) {
+    const NamedDecl * ND = dyn_cast<NamedDecl>(CE->getCalleeDecl());
+    Info.FFDiag(CE, diag::node_constexpr_failed_float_builtin) << (ND ? ND->getDeclName().getAsString() : "unknown");
+    return false;
+  }
+
+  Result = APFloat(op(First.convertToDouble(), Second.convertToDouble()));
+  return true;
+}
+
 static bool TryEvaluateBuiltinNaN(const ASTContext &Context,
                                   QualType ResultTy,
                                   const Expr *Arg,
@@ -19959,8 +20023,10 @@ bool FloatExprEvaluator::VisitCallExpr(const CallExpr *E) {
     return ExprEvaluatorBaseTy::VisitCallExpr(E);
 
   switch (E->getBuiltinCallee()) {
-  default:
-    return false;
+  default: {
+    Info.FFDiag(E, diag::node_constexpr_builtin_is_not_constexpr) << Info.Ctx.BuiltinInfo.getName(E->getBuiltinCallee()) << E->getBuiltinCallee();
+    return Error(E);
+  }
 
   case Builtin::BI__builtin_huge_val:
   case Builtin::BI__builtin_huge_valf:
@@ -19977,7 +20043,55 @@ bool FloatExprEvaluator::VisitCallExpr(const CallExpr *E) {
     Result = llvm::APFloat::getInf(Sem);
     return true;
   }
-
+  
+  #define CE_FLOAT_BUILTIN_UNARY_ONE(name) case Builtin::BI__builtin_##name: { return TryEvaluateAndApplyUnaryOnFloat(Info, [](auto v){ return __builtin_##name (v); }, E, E->getType(), Result); }
+  #define CE_FLOAT_BUILTIN_UNARY_SUFFIX(name, suffix) CE_FLOAT_BUILTIN_UNARY_ONE(name ## suffix)
+  #define CE_FLOAT_BUILTIN_UNARY_THREE(name) CE_FLOAT_BUILTIN_UNARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_UNARY_ONE(name)
+  
+  #define CE_FLOAT_BUILTIN_BINARY_ONE(name) case Builtin::BI__builtin_##name: { return TryEvaluateAndApplyBinaryOnFloat(Info, [](auto a, auto b){ return __builtin_##name (a, b); }, E, E->getType(), Result); }
+  #define CE_FLOAT_BUILTIN_BINARY_SUFFIX(name, suffix) CE_FLOAT_BUILTIN_BINARY_ONE(name ## suffix)
+  #define CE_FLOAT_BUILTIN_BINARY_THREE(name) CE_FLOAT_BUILTIN_BINARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_BINARY_ONE(name)
+  
+  // exponential_functions.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(exp)
+  CE_FLOAT_BUILTIN_UNARY_THREE(exp2)
+  CE_FLOAT_BUILTIN_UNARY_THREE(expm1)
+  CE_FLOAT_BUILTIN_BINARY_THREE(pow)
+  
+  // logarithms.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(log)
+  CE_FLOAT_BUILTIN_UNARY_THREE(log10)
+  CE_FLOAT_BUILTIN_UNARY_THREE(log1p)
+  CE_FLOAT_BUILTIN_UNARY_THREE(log2)
+  CE_FLOAT_BUILTIN_UNARY_THREE(logb)
+ 
+  // gamma.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(lgamma)
+  CE_FLOAT_BUILTIN_UNARY_THREE(tgamma)
+    
+  // hyperbolic_functions.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(cosh)
+  CE_FLOAT_BUILTIN_UNARY_THREE(sinh)
+  CE_FLOAT_BUILTIN_UNARY_THREE(tanh)
+    
+  // roots.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(sqrt)
+    
+  // rounding_functions.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(ceil)
+  CE_FLOAT_BUILTIN_UNARY_THREE(floor)
+  CE_FLOAT_BUILTIN_UNARY_THREE(nearbyint)
+  CE_FLOAT_BUILTIN_BINARY_THREE(nextafter)
+  CE_FLOAT_BUILTIN_BINARY_THREE(nexttoward)
+  CE_FLOAT_BUILTIN_UNARY_THREE(rint)
+  CE_FLOAT_BUILTIN_UNARY_THREE(round)
+  CE_FLOAT_BUILTIN_UNARY_THREE(trunc)
+    
+  // trigonometric_functions.h
+  CE_FLOAT_BUILTIN_UNARY_THREE(cos)
+  CE_FLOAT_BUILTIN_UNARY_THREE(sin)
+  CE_FLOAT_BUILTIN_UNARY_THREE(tan)
+  
   case Builtin::BI__builtin_nans:
   case Builtin::BI__builtin_nansf:
   case Builtin::BI__builtin_nansl:
