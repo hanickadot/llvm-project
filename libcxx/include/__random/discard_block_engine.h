@@ -58,46 +58,46 @@ public:
   _LIBCPP_HIDE_FROM_ABI static _LIBCPP_CONSTEXPR result_type max() { return _Engine::max(); }
 
   // constructors and seeding functions
-  _LIBCPP_HIDE_FROM_ABI discard_block_engine() : __n_(0) {}
-  _LIBCPP_HIDE_FROM_ABI explicit discard_block_engine(const _Engine& __e) : __e_(__e), __n_(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 discard_block_engine() : __n_(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit discard_block_engine(const _Engine& __e) : __e_(__e), __n_(0) {}
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI explicit discard_block_engine(_Engine&& __e) : __e_(std::move(__e)), __n_(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit discard_block_engine(_Engine&& __e) : __e_(std::move(__e)), __n_(0) {}
 #endif // _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI explicit discard_block_engine(result_type __sd) : __e_(__sd), __n_(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit discard_block_engine(result_type __sd) : __e_(__sd), __n_(0) {}
   template <class _Sseq,
             __enable_if_t<__is_seed_sequence_v<_Sseq, discard_block_engine> && !is_convertible<_Sseq, _Engine>::value,
                           int> = 0>
-  _LIBCPP_HIDE_FROM_ABI explicit discard_block_engine(_Sseq& __q) : __e_(__q), __n_(0) {}
-  _LIBCPP_HIDE_FROM_ABI void seed() {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit discard_block_engine(_Sseq& __q) : __e_(__q), __n_(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed() {
     __e_.seed();
     __n_ = 0;
   }
-  _LIBCPP_HIDE_FROM_ABI void seed(result_type __sd) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(result_type __sd) {
     __e_.seed(__sd);
     __n_ = 0;
   }
   template <class _Sseq, __enable_if_t<__is_seed_sequence_v<_Sseq, discard_block_engine>, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI void seed(_Sseq& __q) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(_Sseq& __q) {
     __e_.seed(__q);
     __n_ = 0;
   }
 
   // generating functions
-  _LIBCPP_HIDE_FROM_ABI result_type operator()();
-  _LIBCPP_HIDE_FROM_ABI void discard(unsigned long long __z) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()();
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void discard(unsigned long long __z) {
     for (; __z; --__z)
       operator()();
   }
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI const _Engine& base() const _NOEXCEPT { return __e_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 const _Engine& base() const _NOEXCEPT { return __e_; }
 
   template <class _Eng, size_t _Pp, size_t _Rp>
-  friend bool
+  _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool
   operator==(const discard_block_engine<_Eng, _Pp, _Rp>& __x, const discard_block_engine<_Eng, _Pp, _Rp>& __y);
 
   template <class _Eng, size_t _Pp, size_t _Rp>
-  friend bool
+  _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool
   operator!=(const discard_block_engine<_Eng, _Pp, _Rp>& __x, const discard_block_engine<_Eng, _Pp, _Rp>& __y);
 
   template <class _CharT, class _Traits, class _Eng, size_t _Pp, size_t _Rp>
@@ -110,7 +110,7 @@ public:
 };
 
 template <class _Engine, size_t __p, size_t __r>
-typename discard_block_engine<_Engine, __p, __r>::result_type discard_block_engine<_Engine, __p, __r>::operator()() {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 typename discard_block_engine<_Engine, __p, __r>::result_type discard_block_engine<_Engine, __p, __r>::operator()() {
   if (__n_ >= static_cast<int>(__r)) {
     __e_.discard(__p - __r);
     __n_ = 0;
@@ -120,13 +120,13 @@ typename discard_block_engine<_Engine, __p, __r>::result_type discard_block_engi
 }
 
 template <class _Eng, size_t _Pp, size_t _Rp>
-inline _LIBCPP_HIDE_FROM_ABI bool
+_LIBCPP_CONSTEXPR_SINCE_CXX29 inline _LIBCPP_HIDE_FROM_ABI bool
 operator==(const discard_block_engine<_Eng, _Pp, _Rp>& __x, const discard_block_engine<_Eng, _Pp, _Rp>& __y) {
   return __x.__n_ == __y.__n_ && __x.__e_ == __y.__e_;
 }
 
 template <class _Eng, size_t _Pp, size_t _Rp>
-inline _LIBCPP_HIDE_FROM_ABI bool
+_LIBCPP_CONSTEXPR_SINCE_CXX29 inline _LIBCPP_HIDE_FROM_ABI bool
 operator!=(const discard_block_engine<_Eng, _Pp, _Rp>& __x, const discard_block_engine<_Eng, _Pp, _Rp>& __y) {
   return !(__x == __y);
 }

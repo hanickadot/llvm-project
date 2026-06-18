@@ -36,16 +36,16 @@ public:
   typedef uint32_t result_type;
 
   // constructors
-  _LIBCPP_HIDE_FROM_ABI seed_seq() _NOEXCEPT {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 seed_seq() _NOEXCEPT {}
 #ifndef _LIBCPP_CXX03_LANG
   template <class _Tp, __enable_if_t<is_integral<_Tp>::value, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI seed_seq(initializer_list<_Tp> __il) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 seed_seq(initializer_list<_Tp> __il) {
     __init(__il.begin(), __il.end());
   }
 #endif // _LIBCPP_CXX03_LANG
 
   template <class _InputIterator>
-  _LIBCPP_HIDE_FROM_ABI seed_seq(_InputIterator __first, _InputIterator __last) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 seed_seq(_InputIterator __first, _InputIterator __last) {
     static_assert(is_integral<typename iterator_traits<_InputIterator>::value_type>::value,
                   "Mandates: iterator_traits<InputIterator>::value_type is an integer type");
     __init(__first, __last);
@@ -53,35 +53,35 @@ public:
 
   // generating functions
   template <class _RandomAccessIterator>
-  _LIBCPP_HIDE_FROM_ABI void generate(_RandomAccessIterator __first, _RandomAccessIterator __last);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void generate(_RandomAccessIterator __first, _RandomAccessIterator __last);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI size_t size() const _NOEXCEPT { return __v_.size(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 size_t size() const _NOEXCEPT { return __v_.size(); }
   template <class _OutputIterator>
-  _LIBCPP_HIDE_FROM_ABI void param(_OutputIterator __dest) const {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(_OutputIterator __dest) const {
     std::copy(__v_.begin(), __v_.end(), __dest);
   }
 
   seed_seq(const seed_seq&)       = delete;
   void operator=(const seed_seq&) = delete;
 
-  _LIBCPP_HIDE_FROM_ABI static result_type _Tp(result_type __x) { return __x ^ (__x >> 27); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type _Tp(result_type __x) { return __x ^ (__x >> 27); }
 
 private:
   template <class _InputIterator>
-  _LIBCPP_HIDE_FROM_ABI void __init(_InputIterator __first, _InputIterator __last);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void __init(_InputIterator __first, _InputIterator __last);
 
   vector<result_type> __v_;
 };
 
 template <class _InputIterator>
-void seed_seq::__init(_InputIterator __first, _InputIterator __last) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 void seed_seq::__init(_InputIterator __first, _InputIterator __last) {
   for (_InputIterator __s = __first; __s != __last; ++__s)
     __v_.push_back(*__s & 0xFFFFFFFF);
 }
 
 template <class _RandomAccessIterator>
-void seed_seq::generate(_RandomAccessIterator __first, _RandomAccessIterator __last) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 void seed_seq::generate(_RandomAccessIterator __first, _RandomAccessIterator __last) {
   using _ValueType = typename iterator_traits<_RandomAccessIterator>::value_type;
   static_assert(is_unsigned<_ValueType>::value && sizeof(_ValueType) >= sizeof(uint32_t),
                 "[rand.util.seedseq]/7 requires the value_type of the iterator to be an unsigned "

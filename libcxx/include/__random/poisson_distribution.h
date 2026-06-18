@@ -54,14 +54,14 @@ public:
   public:
     typedef poisson_distribution distribution_type;
 
-    _LIBCPP_HIDE_FROM_ABI explicit param_type(double __mean = 1.0);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit param_type(double __mean = 1.0);
 
-    _LIBCPP_HIDE_FROM_ABI double mean() const { return __mean_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 double mean() const { return __mean_; }
 
-    friend _LIBCPP_HIDE_FROM_ABI bool operator==(const param_type& __x, const param_type& __y) {
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const param_type& __x, const param_type& __y) {
       return __x.__mean_ == __y.__mean_;
     }
-    friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
 
     friend class poisson_distribution;
   };
@@ -72,41 +72,41 @@ private:
 public:
   // constructors and reset functions
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI poisson_distribution() : poisson_distribution(1.0) {}
-  _LIBCPP_HIDE_FROM_ABI explicit poisson_distribution(double __mean) : __p_(__mean) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 poisson_distribution() : poisson_distribution(1.0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit poisson_distribution(double __mean) : __p_(__mean) {}
 #else
   _LIBCPP_HIDE_FROM_ABI explicit poisson_distribution(double __mean = 1.0) : __p_(__mean) {}
 #endif
-  _LIBCPP_HIDE_FROM_ABI explicit poisson_distribution(const param_type& __p) : __p_(__p) {}
-  _LIBCPP_HIDE_FROM_ABI void reset() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit poisson_distribution(const param_type& __p) : __p_(__p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void reset() {}
 
   // generating functions
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g) {
     return (*this)(__g, __p_);
   }
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g, const param_type& __p);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI double mean() const { return __p_.mean(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 double mean() const { return __p_.mean(); }
 
-  _LIBCPP_HIDE_FROM_ABI param_type param() const { return __p_; }
-  _LIBCPP_HIDE_FROM_ABI void param(const param_type& __p) { __p_ = __p; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type param() const { return __p_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(const param_type& __p) { __p_ = __p; }
 
-  _LIBCPP_HIDE_FROM_ABI result_type min() const { return 0; }
-  _LIBCPP_HIDE_FROM_ABI result_type max() const { return numeric_limits<result_type>::max(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type min() const { return 0; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type max() const { return numeric_limits<result_type>::max(); }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool operator==(const poisson_distribution& __x, const poisson_distribution& __y) {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const poisson_distribution& __x, const poisson_distribution& __y) {
     return __x.__p_ == __y.__p_;
   }
-  friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const poisson_distribution& __x, const poisson_distribution& __y) {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const poisson_distribution& __x, const poisson_distribution& __y) {
     return !(__x == __y);
   }
 };
 
 template <class _IntType>
-poisson_distribution<_IntType>::param_type::param_type(double __mean)
+_LIBCPP_CONSTEXPR_SINCE_CXX29 poisson_distribution<_IntType>::param_type::param_type(double __mean)
     // According to the standard `inf` is a valid input, but it causes the
     // distribution to hang, so we replace it with the maximum representable
     // mean.
@@ -138,7 +138,7 @@ poisson_distribution<_IntType>::param_type::param_type(double __mean)
 
 template <class _IntType>
 template <class _URNG>
-_IntType poisson_distribution<_IntType>::operator()(_URNG& __urng, const param_type& __pr) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _IntType poisson_distribution<_IntType>::operator()(_URNG& __urng, const param_type& __pr) {
   static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
   double __tx;
   uniform_real_distribution<double> __urd;

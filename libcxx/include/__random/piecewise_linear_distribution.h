@@ -48,28 +48,28 @@ public:
   public:
     typedef piecewise_linear_distribution distribution_type;
 
-    _LIBCPP_HIDE_FROM_ABI param_type();
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type();
     template <class _InputIteratorB, class _InputIteratorW>
-    _LIBCPP_HIDE_FROM_ABI param_type(_InputIteratorB __f_b, _InputIteratorB __l_b, _InputIteratorW __f_w);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(_InputIteratorB __f_b, _InputIteratorB __l_b, _InputIteratorW __f_w);
 #ifndef _LIBCPP_CXX03_LANG
     template <class _UnaryOperation>
-    _LIBCPP_HIDE_FROM_ABI param_type(initializer_list<result_type> __bl, _UnaryOperation __fw);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(initializer_list<result_type> __bl, _UnaryOperation __fw);
 #endif // _LIBCPP_CXX03_LANG
     template <class _UnaryOperation>
-    _LIBCPP_HIDE_FROM_ABI param_type(size_t __nw, result_type __xmin, result_type __xmax, _UnaryOperation __fw);
-    _LIBCPP_HIDE_FROM_ABI param_type(param_type const&) = default;
-    _LIBCPP_HIDE_FROM_ABI param_type& operator=(const param_type& __rhs);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(size_t __nw, result_type __xmin, result_type __xmax, _UnaryOperation __fw);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(param_type const&) = default;
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type& operator=(const param_type& __rhs);
 
-    _LIBCPP_HIDE_FROM_ABI vector<result_type> intervals() const { return __b_; }
-    _LIBCPP_HIDE_FROM_ABI vector<result_type> densities() const { return __densities_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<result_type> intervals() const { return __b_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<result_type> densities() const { return __densities_; }
 
-    friend _LIBCPP_HIDE_FROM_ABI bool operator==(const param_type& __x, const param_type& __y) {
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const param_type& __x, const param_type& __y) {
       return __x.__densities_ == __y.__densities_ && __x.__b_ == __y.__b_;
     }
-    friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
 
   private:
-    _LIBCPP_HIDE_FROM_ABI void __init();
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void __init();
 
     friend class piecewise_linear_distribution;
 
@@ -87,50 +87,50 @@ private:
 
 public:
   // constructor and reset functions
-  _LIBCPP_HIDE_FROM_ABI piecewise_linear_distribution() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution() {}
   template <class _InputIteratorB, class _InputIteratorW>
-  _LIBCPP_HIDE_FROM_ABI
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29
   piecewise_linear_distribution(_InputIteratorB __f_b, _InputIteratorB __l_b, _InputIteratorW __f_w)
       : __p_(__f_b, __l_b, __f_w) {}
 
 #ifndef _LIBCPP_CXX03_LANG
   template <class _UnaryOperation>
-  _LIBCPP_HIDE_FROM_ABI piecewise_linear_distribution(initializer_list<result_type> __bl, _UnaryOperation __fw)
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution(initializer_list<result_type> __bl, _UnaryOperation __fw)
       : __p_(__bl, __fw) {}
 #endif // _LIBCPP_CXX03_LANG
 
   template <class _UnaryOperation>
-  _LIBCPP_HIDE_FROM_ABI
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29
   piecewise_linear_distribution(size_t __nw, result_type __xmin, result_type __xmax, _UnaryOperation __fw)
       : __p_(__nw, __xmin, __xmax, __fw) {}
 
-  _LIBCPP_HIDE_FROM_ABI explicit piecewise_linear_distribution(const param_type& __p) : __p_(__p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit piecewise_linear_distribution(const param_type& __p) : __p_(__p) {}
 
-  _LIBCPP_HIDE_FROM_ABI void reset() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void reset() {}
 
   // generating functions
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g) {
     return (*this)(__g, __p_);
   }
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g, const param_type& __p);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI vector<result_type> intervals() const { return __p_.intervals(); }
-  _LIBCPP_HIDE_FROM_ABI vector<result_type> densities() const { return __p_.densities(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<result_type> intervals() const { return __p_.intervals(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<result_type> densities() const { return __p_.densities(); }
 
-  _LIBCPP_HIDE_FROM_ABI param_type param() const { return __p_; }
-  _LIBCPP_HIDE_FROM_ABI void param(const param_type& __p) { __p_ = __p; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type param() const { return __p_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(const param_type& __p) { __p_ = __p; }
 
-  _LIBCPP_HIDE_FROM_ABI result_type min() const { return __p_.__b_.front(); }
-  _LIBCPP_HIDE_FROM_ABI result_type max() const { return __p_.__b_.back(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type min() const { return __p_.__b_.front(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type max() const { return __p_.__b_.back(); }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator==(const piecewise_linear_distribution& __x, const piecewise_linear_distribution& __y) {
     return __x.__p_ == __y.__p_;
   }
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator!=(const piecewise_linear_distribution& __x, const piecewise_linear_distribution& __y) {
     return !(__x == __y);
   }
@@ -145,7 +145,7 @@ public:
 };
 
 template <class _RealType>
-typename piecewise_linear_distribution<_RealType>::param_type&
+_LIBCPP_CONSTEXPR_SINCE_CXX29 typename piecewise_linear_distribution<_RealType>::param_type&
 piecewise_linear_distribution<_RealType>::param_type::operator=(const param_type& __rhs) {
   //  These can throw
   __b_.reserve(__rhs.__b_.size());
@@ -160,7 +160,7 @@ piecewise_linear_distribution<_RealType>::param_type::operator=(const param_type
 }
 
 template <class _RealType>
-void piecewise_linear_distribution<_RealType>::param_type::__init() {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 void piecewise_linear_distribution<_RealType>::param_type::__init() {
   __areas_.assign(__densities_.size() - 1, result_type());
   result_type __sp = 0;
   for (size_t __i = 0; __i < __areas_.size(); ++__i) {
@@ -179,13 +179,13 @@ void piecewise_linear_distribution<_RealType>::param_type::__init() {
 }
 
 template <class _RealType>
-piecewise_linear_distribution<_RealType>::param_type::param_type() : __b_(2), __densities_(2, 1.0), __areas_(1, 0.0) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution<_RealType>::param_type::param_type() : __b_(2), __densities_(2, 1.0), __areas_(1, 0.0) {
   __b_[1] = 1;
 }
 
 template <class _RealType>
 template <class _InputIteratorB, class _InputIteratorW>
-piecewise_linear_distribution<_RealType>::param_type::param_type(
+_LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution<_RealType>::param_type::param_type(
     _InputIteratorB __f_b, _InputIteratorB __l_b, _InputIteratorW __f_w)
     : __b_(__f_b, __l_b) {
   if (__b_.size() < 2) {
@@ -205,7 +205,7 @@ piecewise_linear_distribution<_RealType>::param_type::param_type(
 
 template <class _RealType>
 template <class _UnaryOperation>
-piecewise_linear_distribution<_RealType>::param_type::param_type(
+_LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution<_RealType>::param_type::param_type(
     initializer_list<result_type> __bl, _UnaryOperation __fw)
     : __b_(__bl.begin(), __bl.end()) {
   if (__b_.size() < 2) {
@@ -226,7 +226,7 @@ piecewise_linear_distribution<_RealType>::param_type::param_type(
 
 template <class _RealType>
 template <class _UnaryOperation>
-piecewise_linear_distribution<_RealType>::param_type::param_type(
+_LIBCPP_CONSTEXPR_SINCE_CXX29 piecewise_linear_distribution<_RealType>::param_type::param_type(
     size_t __nw, result_type __xmin, result_type __xmax, _UnaryOperation __fw)
     : __b_(__nw == 0 ? 2 : __nw + 1) {
   size_t __n      = __b_.size() - 1;
@@ -243,7 +243,7 @@ piecewise_linear_distribution<_RealType>::param_type::param_type(
 
 template <class _RealType>
 template <class _URNG>
-_RealType piecewise_linear_distribution<_RealType>::operator()(_URNG& __g, const param_type& __p) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _RealType piecewise_linear_distribution<_RealType>::operator()(_URNG& __g, const param_type& __p) {
   static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
   typedef uniform_real_distribution<result_type> _Gen;
   result_type __u = _Gen()(__g);

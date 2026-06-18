@@ -67,7 +67,7 @@ struct __lce_ta;
 template <unsigned long long _Ap, unsigned long long _Cp, unsigned long long _Mp>
 struct __lce_ta<_Ap, _Cp, _Mp, (unsigned long long)(-1), _LCE_Promote> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __xp) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __xp) {
     __extension__ using __calc_type = unsigned __int128;
     const __calc_type __a           = static_cast<__calc_type>(_Ap);
     const __calc_type __c           = static_cast<__calc_type>(_Cp);
@@ -81,7 +81,7 @@ struct __lce_ta<_Ap, _Cp, _Mp, (unsigned long long)(-1), _LCE_Promote> {
 template <unsigned long long __a, unsigned long long __c, unsigned long long __m>
 struct __lce_ta<__a, __c, __m, (unsigned long long)(-1), _LCE_Schrage> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     // Schrage's algorithm
     const result_type __q  = __m / __a;
     const result_type __r  = __m % __a;
@@ -96,7 +96,7 @@ struct __lce_ta<__a, __c, __m, (unsigned long long)(-1), _LCE_Schrage> {
 template <unsigned long long __a, unsigned long long __m>
 struct __lce_ta<__a, 0ull, __m, (unsigned long long)(-1), _LCE_Schrage> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     // Schrage's algorithm
     const result_type __q  = __m / __a;
     const result_type __r  = __m % __a;
@@ -110,7 +110,7 @@ struct __lce_ta<__a, 0ull, __m, (unsigned long long)(-1), _LCE_Schrage> {
 template <unsigned long long __a, unsigned long long __c, unsigned long long __m>
 struct __lce_ta<__a, __c, __m, (unsigned long long)(-1), _LCE_Part> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     // Use (((a*x) % m) + c) % m
     __x = (__a * __x) % __m;
     __x += __c - (__x >= __m - __c) * __m;
@@ -121,13 +121,13 @@ struct __lce_ta<__a, __c, __m, (unsigned long long)(-1), _LCE_Part> {
 template <unsigned long long __a, unsigned long long __c, unsigned long long __m>
 struct __lce_ta<__a, __c, __m, (unsigned long long)(-1), _LCE_Full> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) { return (__a * __x + __c) % __m; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) { return (__a * __x + __c) % __m; }
 };
 
 template <unsigned long long __a, unsigned long long __c>
 struct __lce_ta<__a, __c, 0ull, (unsigned long long)(-1), _LCE_Full> {
   typedef unsigned long long result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) { return __a * __x + __c; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) { return __a * __x + __c; }
 };
 
 // 32
@@ -135,7 +135,7 @@ struct __lce_ta<__a, __c, 0ull, (unsigned long long)(-1), _LCE_Full> {
 template <unsigned long long __a, unsigned long long __c, unsigned long long __m>
 struct __lce_ta<__a, __c, __m, unsigned(-1), _LCE_Promote> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     return static_cast<result_type>(__lce_ta<__a, __c, __m, (unsigned long long)(-1)>::next(__x));
   }
 };
@@ -143,7 +143,7 @@ struct __lce_ta<__a, __c, __m, unsigned(-1), _LCE_Promote> {
 template <unsigned long long _Ap, unsigned long long _Cp, unsigned long long _Mp>
 struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Schrage> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     const result_type __a = static_cast<result_type>(_Ap);
     const result_type __c = static_cast<result_type>(_Cp);
     const result_type __m = static_cast<result_type>(_Mp);
@@ -161,7 +161,7 @@ struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Schrage> {
 template <unsigned long long _Ap, unsigned long long _Mp>
 struct __lce_ta<_Ap, 0ull, _Mp, unsigned(-1), _LCE_Schrage> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     const result_type __a = static_cast<result_type>(_Ap);
     const result_type __m = static_cast<result_type>(_Mp);
     // Schrage's algorithm
@@ -177,7 +177,7 @@ struct __lce_ta<_Ap, 0ull, _Mp, unsigned(-1), _LCE_Schrage> {
 template <unsigned long long _Ap, unsigned long long _Cp, unsigned long long _Mp>
 struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Part> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     const result_type __a = static_cast<result_type>(_Ap);
     const result_type __c = static_cast<result_type>(_Cp);
     const result_type __m = static_cast<result_type>(_Mp);
@@ -191,7 +191,7 @@ struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Part> {
 template <unsigned long long _Ap, unsigned long long _Cp, unsigned long long _Mp>
 struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Full> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     const result_type __a = static_cast<result_type>(_Ap);
     const result_type __c = static_cast<result_type>(_Cp);
     const result_type __m = static_cast<result_type>(_Mp);
@@ -202,7 +202,7 @@ struct __lce_ta<_Ap, _Cp, _Mp, unsigned(-1), _LCE_Full> {
 template <unsigned long long _Ap, unsigned long long _Cp>
 struct __lce_ta<_Ap, _Cp, 0ull, unsigned(-1), _LCE_Full> {
   typedef unsigned result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     const result_type __a = static_cast<result_type>(_Ap);
     const result_type __c = static_cast<result_type>(_Cp);
     return __a * __x + __c;
@@ -214,7 +214,7 @@ struct __lce_ta<_Ap, _Cp, 0ull, unsigned(-1), _LCE_Full> {
 template <unsigned long long __a, unsigned long long __c, unsigned long long __m, __lce_alg_type __mode>
 struct __lce_ta<__a, __c, __m, (unsigned short)(-1), __mode> {
   typedef unsigned short result_type;
-  _LIBCPP_HIDE_FROM_ABI static result_type next(result_type __x) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 static result_type next(result_type __x) {
     return static_cast<result_type>(__lce_ta<__a, __c, __m, unsigned(-1)>::next(__x));
   }
 };
@@ -260,17 +260,17 @@ public:
 
   // constructors and seeding functions
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI linear_congruential_engine() : linear_congruential_engine(default_seed) {}
-  _LIBCPP_HIDE_FROM_ABI explicit linear_congruential_engine(result_type __s) { seed(__s); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 linear_congruential_engine() : linear_congruential_engine(default_seed) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit linear_congruential_engine(result_type __s) { seed(__s); }
 #else
-  _LIBCPP_HIDE_FROM_ABI explicit linear_congruential_engine(result_type __s = default_seed) { seed(__s); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit linear_congruential_engine(result_type __s = default_seed) { seed(__s); }
 #endif
   template <class _Sseq, __enable_if_t<__is_seed_sequence_v<_Sseq, linear_congruential_engine>, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI explicit linear_congruential_engine(_Sseq& __q) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit linear_congruential_engine(_Sseq& __q) {
     seed(__q);
   }
 
-  _LIBCPP_HIDE_FROM_ABI void seed(result_type __s = default_seed) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(result_type __s = default_seed) {
     if _LIBCPP_CONSTEXPR (__m == 0) {
       if _LIBCPP_CONSTEXPR (__c == 0)
         __x_ = __s == 0 ? 1 : __s;
@@ -285,7 +285,7 @@ public:
   }
 
   template <class _Sseq, __enable_if_t<__is_seed_sequence_v<_Sseq, linear_congruential_engine>, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI void seed(_Sseq& __q) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(_Sseq& __q) {
     const _LIBCPP_CONSTEXPR unsigned __k =
         1 + (__m == 0 ? (sizeof(result_type) * __CHAR_BIT__ - 1) / 32 : (__m > 0x100000000ull));
     static_assert(__k <= 2);
@@ -296,19 +296,19 @@ public:
   }
 
   // generating functions
-  _LIBCPP_HIDE_FROM_ABI result_type operator()() {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()() {
     return __x_ = static_cast<result_type>(__lce_ta<__a, __c, __m, _Mp>::next(__x_));
   }
-  _LIBCPP_HIDE_FROM_ABI void discard(unsigned long long __z) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void discard(unsigned long long __z) {
     for (; __z; --__z)
       operator()();
   }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator==(const linear_congruential_engine& __x, const linear_congruential_engine& __y) {
     return __x.__x_ == __y.__x_;
   }
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator!=(const linear_congruential_engine& __x, const linear_congruential_engine& __y) {
     return !(__x == __y);
   }

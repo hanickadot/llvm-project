@@ -41,26 +41,26 @@ public:
   public:
     typedef discrete_distribution distribution_type;
 
-    _LIBCPP_HIDE_FROM_ABI param_type() {}
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type() {}
     template <class _InputIterator>
-    _LIBCPP_HIDE_FROM_ABI param_type(_InputIterator __f, _InputIterator __l) : __p_(__f, __l) {
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(_InputIterator __f, _InputIterator __l) : __p_(__f, __l) {
       __init();
     }
 #ifndef _LIBCPP_CXX03_LANG
-    _LIBCPP_HIDE_FROM_ABI param_type(initializer_list<double> __wl) : __p_(__wl.begin(), __wl.end()) { __init(); }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(initializer_list<double> __wl) : __p_(__wl.begin(), __wl.end()) { __init(); }
 #endif // _LIBCPP_CXX03_LANG
     template <class _UnaryOperation>
-    _LIBCPP_HIDE_FROM_ABI param_type(size_t __nw, double __xmin, double __xmax, _UnaryOperation __fw);
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type(size_t __nw, double __xmin, double __xmax, _UnaryOperation __fw);
 
-    _LIBCPP_HIDE_FROM_ABI vector<double> probabilities() const;
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<double> probabilities() const;
 
-    friend _LIBCPP_HIDE_FROM_ABI bool operator==(const param_type& __x, const param_type& __y) {
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const param_type& __x, const param_type& __y) {
       return __x.__p_ == __y.__p_;
     }
-    friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
 
   private:
-    _LIBCPP_HIDE_FROM_ABI void __init();
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void __init();
 
     friend class discrete_distribution;
 
@@ -78,39 +78,39 @@ private:
 
 public:
   // constructor and reset functions
-  _LIBCPP_HIDE_FROM_ABI discrete_distribution() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 discrete_distribution() {}
   template <class _InputIterator>
-  _LIBCPP_HIDE_FROM_ABI discrete_distribution(_InputIterator __f, _InputIterator __l) : __p_(__f, __l) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 discrete_distribution(_InputIterator __f, _InputIterator __l) : __p_(__f, __l) {}
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI discrete_distribution(initializer_list<double> __wl) : __p_(__wl) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 discrete_distribution(initializer_list<double> __wl) : __p_(__wl) {}
 #endif // _LIBCPP_CXX03_LANG
   template <class _UnaryOperation>
-  _LIBCPP_HIDE_FROM_ABI discrete_distribution(size_t __nw, double __xmin, double __xmax, _UnaryOperation __fw)
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 discrete_distribution(size_t __nw, double __xmin, double __xmax, _UnaryOperation __fw)
       : __p_(__nw, __xmin, __xmax, __fw) {}
-  _LIBCPP_HIDE_FROM_ABI explicit discrete_distribution(const param_type& __p) : __p_(__p) {}
-  _LIBCPP_HIDE_FROM_ABI void reset() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit discrete_distribution(const param_type& __p) : __p_(__p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void reset() {}
 
   // generating functions
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g) {
     return (*this)(__g, __p_);
   }
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g, const param_type& __p);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI vector<double> probabilities() const { return __p_.probabilities(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 vector<double> probabilities() const { return __p_.probabilities(); }
 
-  _LIBCPP_HIDE_FROM_ABI param_type param() const { return __p_; }
-  _LIBCPP_HIDE_FROM_ABI void param(const param_type& __p) { __p_ = __p; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type param() const { return __p_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(const param_type& __p) { __p_ = __p; }
 
-  _LIBCPP_HIDE_FROM_ABI result_type min() const { return 0; }
-  _LIBCPP_HIDE_FROM_ABI result_type max() const { return __p_.__p_.size(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type min() const { return 0; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type max() const { return __p_.__p_.size(); }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool operator==(const discrete_distribution& __x, const discrete_distribution& __y) {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const discrete_distribution& __x, const discrete_distribution& __y) {
     return __x.__p_ == __y.__p_;
   }
-  friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const discrete_distribution& __x, const discrete_distribution& __y) {
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const discrete_distribution& __x, const discrete_distribution& __y) {
     return !(__x == __y);
   }
 
@@ -125,7 +125,7 @@ public:
 
 template <class _IntType>
 template <class _UnaryOperation>
-discrete_distribution<_IntType>::param_type::param_type(
+_LIBCPP_CONSTEXPR_SINCE_CXX29 discrete_distribution<_IntType>::param_type::param_type(
     size_t __nw, double __xmin, double __xmax, _UnaryOperation __fw) {
   if (__nw > 1) {
     __p_.reserve(__nw - 1);
@@ -138,7 +138,7 @@ discrete_distribution<_IntType>::param_type::param_type(
 }
 
 template <class _IntType>
-void discrete_distribution<_IntType>::param_type::__init() {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 void discrete_distribution<_IntType>::param_type::__init() {
   if (!__p_.empty()) {
     if (__p_.size() > 1) {
       double __s = std::accumulate(__p_.begin(), __p_.end(), 0.0);
@@ -155,7 +155,7 @@ void discrete_distribution<_IntType>::param_type::__init() {
 }
 
 template <class _IntType>
-vector<double> discrete_distribution<_IntType>::param_type::probabilities() const {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 vector<double> discrete_distribution<_IntType>::param_type::probabilities() const {
   size_t __n = __p_.size();
   vector<double> __p(__n + 1);
   std::adjacent_difference(__p_.begin(), __p_.end(), __p.begin());
@@ -168,7 +168,7 @@ vector<double> discrete_distribution<_IntType>::param_type::probabilities() cons
 
 template <class _IntType>
 template <class _URNG>
-_IntType discrete_distribution<_IntType>::operator()(_URNG& __g, const param_type& __p) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _IntType discrete_distribution<_IntType>::operator()(_URNG& __g, const param_type& __p) {
   static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
   uniform_real_distribution<double> __gen;
   return static_cast<_IntType>(std::upper_bound(__p.__p_.begin(), __p.__p_.end(), __gen(__g)) - __p.__p_.begin());

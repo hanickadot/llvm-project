@@ -41,7 +41,7 @@ _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _IntT __max_representable_int_for_float(
 //
 // The behavior is undefined if `__r` is NaN.
 template <class _IntT, class _RealT>
-_LIBCPP_HIDE_FROM_ABI _IntT __clamp_to_integral(_RealT __r) _NOEXCEPT {
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 _IntT __clamp_to_integral(_RealT __r) _NOEXCEPT {
   using _IntLim            = numeric_limits<_IntT>;
   using _RealLim           = numeric_limits<_RealT>;
   const _IntT __max_val = std::__max_representable_int_for_float<_IntT, _RealT>();

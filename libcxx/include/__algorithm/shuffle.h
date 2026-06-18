@@ -132,7 +132,7 @@ random_shuffle(_RandomAccessIterator __first,
 #endif
 
 template <class _AlgPolicy, class _RandomAccessIterator, class _Sentinel, class _UniformRandomNumberGenerator>
-_LIBCPP_HIDE_FROM_ABI _RandomAccessIterator
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 _RandomAccessIterator
 __shuffle(_RandomAccessIterator __first, _Sentinel __last_sentinel, _UniformRandomNumberGenerator&& __g) {
   typedef typename iterator_traits<_RandomAccessIterator>::difference_type difference_type;
   typedef uniform_int_distribution<ptrdiff_t> _Dp;
@@ -154,7 +154,7 @@ __shuffle(_RandomAccessIterator __first, _Sentinel __last_sentinel, _UniformRand
 }
 
 template <class _RandomAccessIterator, class _UniformRandomNumberGenerator>
-_LIBCPP_HIDE_FROM_ABI void
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void
 shuffle(_RandomAccessIterator __first, _RandomAccessIterator __last, _UniformRandomNumberGenerator&& __g) {
   (void)std::__shuffle<_ClassicAlgPolicy>(
       std::move(__first), std::move(__last), std::forward<_UniformRandomNumberGenerator>(__g));

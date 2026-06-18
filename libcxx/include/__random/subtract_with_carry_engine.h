@@ -33,11 +33,11 @@ template <class _UIntType, size_t __w, size_t __s, size_t __r>
 class subtract_with_carry_engine;
 
 template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-_LIBCPP_HIDE_FROM_ABI bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                                       const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y);
 
 template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-_LIBCPP_HIDE_FROM_ABI bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                                       const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y);
 
 template <class _CharT, class _Traits, class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
@@ -81,17 +81,17 @@ public:
 
   // constructors and seeding functions
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI subtract_with_carry_engine() : subtract_with_carry_engine(default_seed) {}
-  _LIBCPP_HIDE_FROM_ABI explicit subtract_with_carry_engine(result_type __sd) { seed(__sd); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 subtract_with_carry_engine() : subtract_with_carry_engine(default_seed) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit subtract_with_carry_engine(result_type __sd) { seed(__sd); }
 #else
-  _LIBCPP_HIDE_FROM_ABI explicit subtract_with_carry_engine(result_type __sd = default_seed) { seed(__sd); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit subtract_with_carry_engine(result_type __sd = default_seed) { seed(__sd); }
 #endif
   template <class _Sseq, __enable_if_t<__is_seed_sequence_v<_Sseq, subtract_with_carry_engine>, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI explicit subtract_with_carry_engine(_Sseq& __q) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit subtract_with_carry_engine(_Sseq& __q) {
     seed(__q);
   }
 
-  _LIBCPP_HIDE_FROM_ABI void seed(result_type __sd = default_seed) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(result_type __sd = default_seed) {
     linear_congruential_engine<result_type, 40014u, 0u, 2147483563u> __e(__sd == 0u ? default_seed : __sd);
     for (size_t __i = 0; __i < __r; ++__i) {
       if _LIBCPP_CONSTEXPR ((1 + (__w - 1) / 32) == 1) {
@@ -106,7 +106,7 @@ public:
   }
 
   template <class _Sseq, __enable_if_t<__is_seed_sequence_v<_Sseq, subtract_with_carry_engine>, int> = 0>
-  _LIBCPP_HIDE_FROM_ABI void seed(_Sseq& __q) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void seed(_Sseq& __q) {
     const unsigned __k = 1 + (__w - 1) / 32;
     static_assert(__k <= 2);
     uint32_t __ar[__r * __k];
@@ -122,18 +122,18 @@ public:
   }
 
   // generating functions
-  _LIBCPP_HIDE_FROM_ABI result_type operator()();
-  _LIBCPP_HIDE_FROM_ABI void discard(unsigned long long __z) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()();
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void discard(unsigned long long __z) {
     for (; __z; --__z)
       operator()();
   }
 
   template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-  friend bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+  friend _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                          const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y);
 
   template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-  friend bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+  friend _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                          const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y);
 
   template <class _CharT, class _Traits, class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
@@ -146,7 +146,7 @@ public:
 };
 
 template <class _UIntType, size_t __w, size_t __s, size_t __r>
-_UIntType subtract_with_carry_engine<_UIntType, __w, __s, __r>::operator()() {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _UIntType subtract_with_carry_engine<_UIntType, __w, __s, __r>::operator()() {
   const result_type& __xs = __x_[(__i_ + (__r - __s)) % __r];
   result_type& __xr       = __x_[__i_];
   result_type __new_c     = __c_ == 0 ? __xs < __xr : __xs != 0 ? __xs <= __xr : 1;
@@ -157,7 +157,7 @@ _UIntType subtract_with_carry_engine<_UIntType, __w, __s, __r>::operator()() {
 }
 
 template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-_LIBCPP_HIDE_FROM_ABI bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                                       const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y) {
   if (__x.__c_ != __y.__c_)
     return false;
@@ -188,7 +188,7 @@ _LIBCPP_HIDE_FROM_ABI bool operator==(const subtract_with_carry_engine<_UInt, _W
 }
 
 template <class _UInt, size_t _Wp, size_t _Sp, size_t _Rp>
-inline _LIBCPP_HIDE_FROM_ABI bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __x,
                                              const subtract_with_carry_engine<_UInt, _Wp, _Sp, _Rp>& __y) {
   return !(__x == __y);
 }

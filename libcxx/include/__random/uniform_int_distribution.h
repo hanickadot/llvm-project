@@ -61,18 +61,18 @@ private:
 
 public:
   // constructors and seeding functions
-  _LIBCPP_HIDE_FROM_ABI __independent_bits_engine(_Engine& __e, size_t __w);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 __independent_bits_engine(_Engine& __e, size_t __w);
 
   // generating functions
-  _LIBCPP_HIDE_FROM_ABI result_type operator()() { return __eval(integral_constant<bool, _Rp != 0>()); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()() { return __eval(integral_constant<bool, _Rp != 0>()); }
 
 private:
-  _LIBCPP_HIDE_FROM_ABI result_type __eval(false_type);
-  _LIBCPP_HIDE_FROM_ABI result_type __eval(true_type);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type __eval(false_type);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type __eval(true_type);
 };
 
 template <class _Engine, class _UIntType>
-__independent_bits_engine<_Engine, _UIntType>::__independent_bits_engine(_Engine& __e, size_t __w)
+_LIBCPP_CONSTEXPR_SINCE_CXX29 __independent_bits_engine<_Engine, _UIntType>::__independent_bits_engine(_Engine& __e, size_t __w)
     : __e_(__e), __w_(__w) {
   __n_  = __w_ / __m + (__w_ % __m != 0);
   __w0_ = __w_ / __n_;
@@ -100,12 +100,12 @@ __independent_bits_engine<_Engine, _UIntType>::__independent_bits_engine(_Engine
 }
 
 template <class _Engine, class _UIntType>
-inline _UIntType __independent_bits_engine<_Engine, _UIntType>::__eval(false_type) {
+inline _LIBCPP_CONSTEXPR_SINCE_CXX29 _UIntType __independent_bits_engine<_Engine, _UIntType>::__eval(false_type) {
   return static_cast<result_type>(__e_() & __mask0_);
 }
 
 template <class _Engine, class _UIntType>
-_UIntType __independent_bits_engine<_Engine, _UIntType>::__eval(true_type) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _UIntType __independent_bits_engine<_Engine, _UIntType>::__eval(true_type) {
   const size_t __w_rt = numeric_limits<result_type>::digits;
   result_type __sp    = 0;
   for (size_t __k = 0; __k < __n0_; ++__k) {
@@ -148,16 +148,16 @@ public:
   public:
     typedef uniform_int_distribution distribution_type;
 
-    _LIBCPP_HIDE_FROM_ABI explicit param_type(result_type __a = 0, result_type __b = numeric_limits<result_type>::max())
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit param_type(result_type __a = 0, result_type __b = numeric_limits<result_type>::max())
         : __a_(__a), __b_(__b) {}
 
-    _LIBCPP_HIDE_FROM_ABI result_type a() const { return __a_; }
-    _LIBCPP_HIDE_FROM_ABI result_type b() const { return __b_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type a() const { return __a_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type b() const { return __b_; }
 
-    _LIBCPP_HIDE_FROM_ABI friend bool operator==(const param_type& __x, const param_type& __y) {
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool operator==(const param_type& __x, const param_type& __y) {
       return __x.__a_ == __y.__a_ && __x.__b_ == __y.__b_;
     }
-    _LIBCPP_HIDE_FROM_ABI friend bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
   };
 
 private:
@@ -166,40 +166,40 @@ private:
 public:
   // constructors and reset functions
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI uniform_int_distribution() : uniform_int_distribution(0) {}
-  _LIBCPP_HIDE_FROM_ABI explicit uniform_int_distribution(
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 uniform_int_distribution() : uniform_int_distribution(0) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit uniform_int_distribution(
       result_type __a, result_type __b = numeric_limits<result_type>::max())
       : __p_(param_type(__a, __b)) {}
 #else
   explicit uniform_int_distribution(result_type __a = 0, result_type __b = numeric_limits<result_type>::max())
       : __p_(param_type(__a, __b)) {}
 #endif
-  _LIBCPP_HIDE_FROM_ABI explicit uniform_int_distribution(const param_type& __p) : __p_(__p) {}
-  _LIBCPP_HIDE_FROM_ABI void reset() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit uniform_int_distribution(const param_type& __p) : __p_(__p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void reset() {}
 
   // generating functions
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g) {
     return (*this)(__g, __p_);
   }
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g, const param_type& __p);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI result_type a() const { return __p_.a(); }
-  _LIBCPP_HIDE_FROM_ABI result_type b() const { return __p_.b(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type a() const { return __p_.a(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type b() const { return __p_.b(); }
 
-  _LIBCPP_HIDE_FROM_ABI param_type param() const { return __p_; }
-  _LIBCPP_HIDE_FROM_ABI void param(const param_type& __p) { __p_ = __p; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type param() const { return __p_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(const param_type& __p) { __p_ = __p; }
 
-  _LIBCPP_HIDE_FROM_ABI result_type min() const { return a(); }
-  _LIBCPP_HIDE_FROM_ABI result_type max() const { return b(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type min() const { return a(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type max() const { return b(); }
 
-  _LIBCPP_HIDE_FROM_ABI friend bool
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool
   operator==(const uniform_int_distribution& __x, const uniform_int_distribution& __y) {
     return __x.__p_ == __y.__p_;
   }
-  _LIBCPP_HIDE_FROM_ABI friend bool
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 friend bool
   operator!=(const uniform_int_distribution& __x, const uniform_int_distribution& __y) {
     return !(__x == __y);
   }
@@ -207,7 +207,7 @@ public:
 
 template <class _IntType>
 template <class _URNG>
-typename uniform_int_distribution<_IntType>::result_type uniform_int_distribution<_IntType>::operator()(
+_LIBCPP_CONSTEXPR_SINCE_CXX29 typename uniform_int_distribution<_IntType>::result_type uniform_int_distribution<_IntType>::operator()(
     _URNG& __g, const param_type& __p) _LIBCPP_DISABLE_UBSAN_UNSIGNED_INTEGER_CHECK {
   static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
   typedef __conditional_t<sizeof(result_type) <= sizeof(uint32_t), uint32_t, __make_unsigned_t<result_type> > _UIntType;

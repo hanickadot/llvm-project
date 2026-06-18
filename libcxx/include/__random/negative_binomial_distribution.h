@@ -42,15 +42,15 @@ public:
   public:
     typedef negative_binomial_distribution distribution_type;
 
-    _LIBCPP_HIDE_FROM_ABI explicit param_type(result_type __k = 1, double __p = 0.5) : __k_(__k), __p_(__p) {}
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit param_type(result_type __k = 1, double __p = 0.5) : __k_(__k), __p_(__p) {}
 
-    _LIBCPP_HIDE_FROM_ABI result_type k() const { return __k_; }
-    _LIBCPP_HIDE_FROM_ABI double p() const { return __p_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type k() const { return __k_; }
+    _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 double p() const { return __p_; }
 
-    friend _LIBCPP_HIDE_FROM_ABI bool operator==(const param_type& __x, const param_type& __y) {
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator==(const param_type& __x, const param_type& __y) {
       return __x.__k_ == __y.__k_ && __x.__p_ == __y.__p_;
     }
-    friend _LIBCPP_HIDE_FROM_ABI bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
+    friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool operator!=(const param_type& __x, const param_type& __y) { return !(__x == __y); }
   };
 
 private:
@@ -59,38 +59,38 @@ private:
 public:
   // constructor and reset functions
 #ifndef _LIBCPP_CXX03_LANG
-  _LIBCPP_HIDE_FROM_ABI negative_binomial_distribution() : negative_binomial_distribution(1) {}
-  _LIBCPP_HIDE_FROM_ABI explicit negative_binomial_distribution(result_type __k, double __p = 0.5) : __p_(__k, __p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 negative_binomial_distribution() : negative_binomial_distribution(1) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit negative_binomial_distribution(result_type __k, double __p = 0.5) : __p_(__k, __p) {}
 #else
-  _LIBCPP_HIDE_FROM_ABI explicit negative_binomial_distribution(result_type __k = 1, double __p = 0.5)
+  _LIBCPP_HIDE_FROM_ABI  explicit negative_binomial_distribution(result_type __k = 1, double __p = 0.5)
       : __p_(__k, __p) {}
 #endif
-  _LIBCPP_HIDE_FROM_ABI explicit negative_binomial_distribution(const param_type& __p) : __p_(__p) {}
-  _LIBCPP_HIDE_FROM_ABI void reset() {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 explicit negative_binomial_distribution(const param_type& __p) : __p_(__p) {}
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void reset() {}
 
   // generating functions
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g) {
     return (*this)(__g, __p_);
   }
   template <class _URNG>
-  _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p);
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type operator()(_URNG& __g, const param_type& __p);
 
   // property functions
-  _LIBCPP_HIDE_FROM_ABI result_type k() const { return __p_.k(); }
-  _LIBCPP_HIDE_FROM_ABI double p() const { return __p_.p(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type k() const { return __p_.k(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 double p() const { return __p_.p(); }
 
-  _LIBCPP_HIDE_FROM_ABI param_type param() const { return __p_; }
-  _LIBCPP_HIDE_FROM_ABI void param(const param_type& __p) { __p_ = __p; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 param_type param() const { return __p_; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void param(const param_type& __p) { __p_ = __p; }
 
-  _LIBCPP_HIDE_FROM_ABI result_type min() const { return 0; }
-  _LIBCPP_HIDE_FROM_ABI result_type max() const { return numeric_limits<result_type>::max(); }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type min() const { return 0; }
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 result_type max() const { return numeric_limits<result_type>::max(); }
 
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator==(const negative_binomial_distribution& __x, const negative_binomial_distribution& __y) {
     return __x.__p_ == __y.__p_;
   }
-  friend _LIBCPP_HIDE_FROM_ABI bool
+  friend _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   operator!=(const negative_binomial_distribution& __x, const negative_binomial_distribution& __y) {
     return !(__x == __y);
   }
@@ -98,7 +98,7 @@ public:
 
 template <class _IntType>
 template <class _URNG>
-_IntType negative_binomial_distribution<_IntType>::operator()(_URNG& __urng, const param_type& __pr) {
+_LIBCPP_CONSTEXPR_SINCE_CXX29 _IntType negative_binomial_distribution<_IntType>::operator()(_URNG& __urng, const param_type& __pr) {
   static_assert(__libcpp_random_is_valid_urng<_URNG>::value, "");
   result_type __k = __pr.k();
   double __p      = __pr.p();
