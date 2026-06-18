@@ -12,7 +12,7 @@
 #include <__config>
 #include <__random/exponential_distribution.h>
 #include <__random/is_valid.h>
-#include <cmath>
+#include <__math/exponential_functions.h>
 #include <iosfwd>
 #include <limits>
 
@@ -75,7 +75,7 @@ public:
   }
   template <class _URNG>
   _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p) {
-    return __p.b() * std::pow(exponential_distribution<result_type>()(__g), 1 / __p.a());
+    return __p.b() * __math::pow(exponential_distribution<result_type>()(__g), 1 / __p.a());
   }
 
   // property functions

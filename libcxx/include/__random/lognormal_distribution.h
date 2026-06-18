@@ -12,7 +12,7 @@
 #include <__config>
 #include <__random/is_valid.h>
 #include <__random/normal_distribution.h>
-#include <cmath>
+#include <__math/exponential_functions.h>
 #include <iosfwd>
 #include <limits>
 
@@ -69,13 +69,13 @@ public:
   // generating functions
   template <class _URNG>
   _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g) {
-    return std::exp(__nd_(__g));
+    return __math::exp(__nd_(__g));
   }
 
   template <class _URNG>
   _LIBCPP_HIDE_FROM_ABI result_type operator()(_URNG& __g, const param_type& __p) {
     typename normal_distribution<result_type>::param_type __pn(__p.m(), __p.s());
-    return std::exp(__nd_(__g, __pn));
+    return __math::exp(__nd_(__g, __pn));
   }
 
   // property functions
