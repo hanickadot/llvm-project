@@ -2147,6 +2147,10 @@ def fconstant_float_number_class_EQ : Joined<["-"], "fconstant-float-number-clas
 def fconstant_double_number_class_EQ : Joined<["-"], "fconstant-double-number-class=">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option]>,
   MarshallingInfoString<LangOpts<"ObjCConstantDoubleNumberClass">>;
+def fimplicit_constexpr : Joined<["-"], "fimplicit-constexpr">, Group<f_Group>,
+  Visibility<[ClangOption, CC1Option]>,
+  HelpText<"All function declarations will be implicitly constexpr.">,
+  MarshallingInfoFlag<LangOpts<"ImplicitConstexpr">>;
 def fconstexpr_depth_EQ : Joined<["-"], "fconstexpr-depth=">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option]>,
   HelpText<"Set the maximum depth of recursive constexpr function calls">,

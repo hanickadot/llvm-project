@@ -959,7 +959,7 @@ static bool diagnoseCallableDecl(InterpState &S, CodePtr OpPC,
   const auto *CD = dyn_cast<CXXConstructorDecl>(DiagDecl);
   if (CD && CD->isInheritingConstructor()) {
     const auto *Inherited = CD->getInheritedConstructor().getConstructor();
-    if (!Inherited->isConstexpr())
+    if (!Inherited->isConstexprOrImplicitlyCanBe(S.getLangOpts()))
       DiagDecl = CD = Inherited;
   }
 
@@ -982,18 +982,25 @@ static bool diagnoseCallableDecl(InterpState &S, CodePtr OpPC,
     // actually calling it.
     bool IsExtern = DiagDecl->getStorageClass() == SC_Extern;
     bool IsDefined = DiagDecl->isDefined();
-    if (!IsDefined && !IsExtern && DiagDecl->isConstexpr() &&
+    if (!IsDefined && !IsExtern && DiagDecl->isConstexprOrImplicitlyCanBe(S.getLangOpts()) &&
         S.checkingPotentialConstantExpression())
       return false;
 
     // If the declaration is defined, declared 'constexpr' _and_ has a body,
     // the below diagnostic doesn't add anything useful.
-    if (DiagDecl->isDefined() && DiagDecl->isConstexpr() && DiagDecl->hasBody())
+    if (DiagDecl->isDefined() && DiagDecl->isConstexprOrImplicitlyCanBe(S.getLangOpts()) && DiagDecl->hasBody())
       return false;
 
-    S.FFDiag(S.Current->getLocation(OpPC),
-             diag::note_constexpr_invalid_function, 1)
-        << DiagDecl->isConstexpr() << (bool)CD << DiagDecl;
+    if (S.getLangOpts().ImplicitConstexpr && !DiagDecl->isInlined()) {
+      S.FFDiag(S.Current->getLocation(OpPC),
+               diag::note_constexpr_implicit_constexpr_must_be_inlined, 1)
+          << DiagDecl;
+    } else {
+      S.FFDiag(S.Current->getLocation(OpPC),
+               diag::note_constexpr_invalid_function, 1)
+          << DiagDecl->isConstexprOrImplicitlyCanBe(S.getLangOpts())
+          << (bool)CD << DiagDecl;
+    }
 
     if (DiagDecl->getDefinition())
       S.Note(DiagDecl->getDefinition()->getLocation(), diag::note_declared_at);
@@ -1012,8 +1019,8 @@ static bool CheckCallable(InterpState &S, CodePtr OpPC, const Function *F) {
   }
 
   if (F->isValid() && F->hasBody() &&
-      (F->isConstexpr() || (S.Current->MSVCConstexprAllowed &&
-                            F->getDecl()->hasAttr<MSConstexprAttr>())))
+      (F->getDecl()->isConstexprOrImplicitlyCanBe(S.getLangOpts()) 
+        || (S.Current->MSVCConstexprAllowed && F->getDecl()->hasAttr<MSConstexprAttr>())))
     return true;
 
   const FunctionDecl *DiagDecl = F->getDecl();
