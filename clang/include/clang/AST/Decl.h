@@ -2319,6 +2319,8 @@ public:
     const FunctionDecl* Definition;
     return getBody(Definition);
   }
+  
+  Stmt *getConstevalBody(const FunctionDecl *&Definition) const;
 
   /// Returns whether this specific declaration of the function is also a
   /// definition that does not contain uninstantiated body.

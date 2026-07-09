@@ -3304,6 +3304,19 @@ Stmt *FunctionDecl::getBody(const FunctionDecl *&Definition) const {
   return nullptr;
 }
 
+Stmt *FunctionDecl::getConstevalBody(const FunctionDecl *&Definition) const {
+  auto * CIA = this->getAttr<clang::ConstevalImplementationAttr>();
+  if (CIA) {
+    auto * CI = CIA->getImplementation();
+    if (CI) {
+      Definition = CI;
+      return Definition->getBody(Definition);
+    }
+  }
+  
+  return getBody(Definition);
+}
+
 void FunctionDecl::setBody(Stmt *B) {
   FunctionDeclBits.HasDefaultedOrDeletedInfo = false;
   Body = LazyDeclStmtPtr(B);

@@ -7455,6 +7455,29 @@ static void handlePersonalityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
       << AL.getAttrName();
 }
 
+ConstevalImplementationAttr *Sema::mergeConstevalImplementationAttr(Decl *D, FunctionDecl *Alternative,
+                                            const AttributeCommonInfo &CI) {
+  if (ConstevalImplementationAttr *CImpl = D->getAttr<ConstevalImplementationAttr>()) {
+    const FunctionDecl *Implementation = CImpl->getImplementation();
+    if (Context.isSameEntity(Implementation, Alternative))
+      return nullptr;
+    Diag(CImpl->getLocation(), diag::err_mismatched_constaval_implementation); 
+    Diag(CI.getLoc(), diag::note_previous_attribute);
+    D->dropAttr<ConstevalImplementationAttr>();
+  }
+  return ::new (Context) ConstevalImplementationAttr(Context, CI, Alternative);
+}
+
+static void handleConstevalImplementationAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  Expr *E = AL.getArgAsExpr(0);
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DRE->getDecl())) {
+      // check that form is same
+      if (Attr *A = S.mergeConstevalImplementationAttr(D, FD, AL))
+        return D->addAttr(A);
+    }
+}
+
 /// ProcessDeclAttribute - Apply the specific attribute to the specified decl if
 /// the attribute applies to decls.  If the attribute is a type attribute, just
 /// silently ignore it if a GNU attribute.
@@ -8115,6 +8138,10 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
 
   case ParsedAttr::AT_Personality:
     handlePersonalityAttr(S, D, AL);
+    break;
+  
+  case ParsedAttr::AT_ConstevalImplementation:
+    handleConstevalImplementationAttr(S, D, AL);
     break;
 
   // Microsoft attributes:
