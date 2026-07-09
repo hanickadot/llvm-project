@@ -20059,11 +20059,13 @@ bool FloatExprEvaluator::VisitCallExpr(const CallExpr *E) {
   
   #define CE_FLOAT_BUILTIN_UNARY_ONE(name) case Builtin::BI__builtin_##name: { return TryEvaluateAndApplyUnaryOnFloat(Info, [](auto v){ return __builtin_##name (v); }, E, E->getType(), Result); }
   #define CE_FLOAT_BUILTIN_UNARY_SUFFIX(name, suffix) CE_FLOAT_BUILTIN_UNARY_ONE(name ## suffix)
-  #define CE_FLOAT_BUILTIN_UNARY_THREE(name) CE_FLOAT_BUILTIN_UNARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_UNARY_ONE(name)
+  #define CE_FLOAT_BUILTIN_UNARY_C(name) case Builtin::BI##name: { return TryEvaluateAndApplyUnaryOnFloat(Info, [](auto v){ return __builtin_##name (v); }, E, E->getType(), Result); }
+  #define CE_FLOAT_BUILTIN_UNARY_THREE(name) CE_FLOAT_BUILTIN_UNARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_UNARY_ONE(name) CE_FLOAT_BUILTIN_UNARY_C(name)
   
   #define CE_FLOAT_BUILTIN_BINARY_ONE(name) case Builtin::BI__builtin_##name: { return TryEvaluateAndApplyBinaryOnFloat(Info, [](auto a, auto b){ return __builtin_##name (a, b); }, E, E->getType(), Result); }
   #define CE_FLOAT_BUILTIN_BINARY_SUFFIX(name, suffix) CE_FLOAT_BUILTIN_BINARY_ONE(name ## suffix)
-  #define CE_FLOAT_BUILTIN_BINARY_THREE(name) CE_FLOAT_BUILTIN_BINARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_BINARY_ONE(name)
+  #define CE_FLOAT_BUILTIN_BINARY_C(name) case Builtin::BI##name: { return TryEvaluateAndApplyBinaryOnFloat(Info, [](auto a, auto b){ return __builtin_##name (a, b); }, E, E->getType(), Result); }
+  #define CE_FLOAT_BUILTIN_BINARY_THREE(name) CE_FLOAT_BUILTIN_BINARY_SUFFIX(name, f) CE_FLOAT_BUILTIN_BINARY_ONE(name) CE_FLOAT_BUILTIN_BINARY_C(name)
   
   // exponential_functions.h
   CE_FLOAT_BUILTIN_UNARY_THREE(exp)
