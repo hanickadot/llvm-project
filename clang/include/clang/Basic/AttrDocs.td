@@ -4812,6 +4812,13 @@ Semantics of this attribute are enabled only under MSVC compatibility
   }];
 }
 
+def ConstevalImplementationDocs : Documentation {
+  let Category = DocCatStmt;
+  let Content = [{
+The ``[[clang::consteval_implementation]]`` attribute provides name of alternative symbol to be called instead of the function on which it is applied. This allows constexpr-ification without ABI implications.
+  }];
+}
+
 def MSNoVTableDocs : Documentation {
   let Category = DocCatDecl;
   let Content = [{

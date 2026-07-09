@@ -2049,6 +2049,9 @@ def err_mismatched_personality
 def err_attribute_personality_arg_not_function
   : Error<"%0 argument is not a function">;
 
+def err_mismatched_constaval_implementation
+  : Error<"consteval implementation in declaration does not match previous declaration">;
+
 // C++ access checking
 def err_class_redeclared_with_different_access : Error<
   "%0 redeclared with '%1' access">;

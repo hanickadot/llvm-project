@@ -5054,6 +5054,9 @@ public:
 
   PersonalityAttr *mergePersonalityAttr(Decl *D, FunctionDecl *Routine,
                                         const AttributeCommonInfo &CI);
+  
+  ConstevalImplementationAttr *mergeConstevalImplementationAttr(Decl *D, FunctionDecl *Alternative,
+                                        const AttributeCommonInfo &CI);
 
   /// AddAlignedAttr - Adds an aligned attribute to a particular declaration.
   void AddAlignedAttr(Decl *D, const AttributeCommonInfo &CI, Expr *E,

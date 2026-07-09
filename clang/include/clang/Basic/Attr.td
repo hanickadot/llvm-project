@@ -4424,6 +4424,13 @@ def MSConstexpr : InheritableAttr {
   let Documentation = [MSConstexprDocs];
 }
 
+def ConstevalImplementation : InheritableAttr {
+  let Spellings = [CXX11<"clang", "consteval_implementation">];
+  let Subjects = SubjectList<[Function]>;
+  let Args = [DeclArgument<Function, "Implementation">];
+  let Documentation = [ConstevalImplementationDocs];
+}
+
 def MSNoVTable : InheritableAttr, TargetSpecificAttr<TargetMicrosoftCXXABI> {
   let Spellings = [Declspec<"novtable">];
   let Subjects = SubjectList<[CXXRecord]>;

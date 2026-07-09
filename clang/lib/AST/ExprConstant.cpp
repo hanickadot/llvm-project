@@ -7413,7 +7413,7 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
     return false;
 
   const FunctionDecl *Definition = nullptr;
-  const Stmt *Body = DD->getBody(Definition);
+  const Stmt *Body = DD->getConstevalBody(Definition);
 
   if (!CheckConstexprFunction(Info, CallRange.getBegin(), DD, Definition, Body))
     return false;
@@ -8877,7 +8877,7 @@ public:
     }
 
     const FunctionDecl *Definition = nullptr;
-    Stmt *Body = FD->getBody(Definition);
+    Stmt *Body = FD->getConstevalBody(Definition);
     SourceLocation Loc = E->getExprLoc();
 
     // Treat the object argument as `this` when evaluating defaulted
@@ -11502,7 +11502,7 @@ bool RecordExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
   }
 
   const FunctionDecl *Definition = nullptr;
-  auto Body = FD->getBody(Definition);
+  auto Body = FD->getConstevalBody(Definition);
 
   if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body))
     return false;
@@ -11543,7 +11543,7 @@ bool RecordExprEvaluator::VisitCXXInheritedCtorInitExpr(
     return false;
 
   const FunctionDecl *Definition = nullptr;
-  auto Body = FD->getBody(Definition);
+  auto Body = FD->getConstevalBody(Definition);
 
   if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body))
     return false;
