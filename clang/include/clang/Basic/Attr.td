@@ -4427,8 +4427,11 @@ def MSConstexpr : InheritableAttr {
 def ConstevalImplementation : InheritableAttr {
   let Spellings = [CXX11<"clang", "consteval_implementation">];
   let Subjects = SubjectList<[Function]>;
-  let Args = [DeclArgument<Function, "Implementation">];
+  let Args = [IdentifierArgument<"Implementation">];
   let Documentation = [ConstevalImplementationDocs];
+  let AdditionalMembers = [{
+    const FunctionDecl * SelectedImplementation;
+  }];
 }
 
 def MSNoVTable : InheritableAttr, TargetSpecificAttr<TargetMicrosoftCXXABI> {
