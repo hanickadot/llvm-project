@@ -74,6 +74,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
 #include <optional>
+#include <iostream>
 
 using namespace clang;
 using namespace sema;
@@ -7458,24 +7459,118 @@ static void handlePersonalityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
 ConstevalImplementationAttr *Sema::mergeConstevalImplementationAttr(Decl *D, FunctionDecl *Alternative,
                                             const AttributeCommonInfo &CI) {
   if (ConstevalImplementationAttr *CImpl = D->getAttr<ConstevalImplementationAttr>()) {
-    const FunctionDecl *Implementation = CImpl->getImplementation();
-    if (Context.isSameEntity(Implementation, Alternative))
-      return nullptr;
-    Diag(CImpl->getLocation(), diag::err_mismatched_constaval_implementation); 
-    Diag(CI.getLoc(), diag::note_previous_attribute);
-    D->dropAttr<ConstevalImplementationAttr>();
+    //const FunctionDecl *Implementation = CImpl->getImplementation();
+    //if (Context.isSameEntity(Implementation, Alternative))
+    //  return nullptr;
+    //Diag(CImpl->getLocation(), diag::err_mismatched_constaval_implementation); 
+    //Diag(CI.getLoc(), diag::note_previous_attribute);
+    //D->dropAttr<ConstevalImplementationAttr>();
   }
-  return ::new (Context) ConstevalImplementationAttr(Context, CI, Alternative);
+  return ::new (Context) ConstevalImplementationAttr(Context, CI, nullptr);
 }
 
+template <typename> struct identify;
+
 static void handleConstevalImplementationAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
-  Expr *E = AL.getArgAsExpr(0);
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DRE->getDecl())) {
-      // check that form is same
-      if (Attr *A = S.mergeConstevalImplementationAttr(D, FD, AL))
-        return D->addAttr(A);
+  if (!AL.isArgIdent(0)) {
+    return; // TODO error message
+  }
+  IdentifierLoc *ILoc = AL.getArgAsIdent(0);
+  if (!ILoc) {
+    return;
+  }
+  IdentifierInfo *II = ILoc->getIdentifierInfo();
+  std::cout << std::string_view{II->getName()} << "\n";
+    
+  if (const FunctionDecl * FD = dyn_cast<FunctionDecl>(D)) {
+    const CXXMethodDecl * MD = dyn_cast<CXXMethodDecl>(D);
+    std::cout << "is a function decl\n";
+    
+    DeclContext *DC = D->getDeclContext();
+    
+    LookupResult R(S, II, SourceLocation(), Sema::LookupOrdinaryName);
+
+    if (S.LookupQualifiedName(R, DC)) {
+      
+      std::cout << "found something!";
+      
+      const FunctionDecl * candidate = nullptr;
+      size_t count = 0;
+      
+      for (const clang::NamedDecl * x: R) {
+        std::cout << "iterating:\n";
+        x->dump();
+        const FunctionDecl * OFD = dyn_cast<FunctionDecl>(x);
+        if (OFD->isImmediateFunction()) {
+          const CXXMethodDecl * method = dyn_cast<CXXMethodDecl>(x);
+          if (method) {
+            if (!MD) {
+              continue;
+            }
+            if (method->getThisType() != MD->getThisType()) {
+              continue;
+            }
+          }
+          if (FD->getNumParams() == OFD->getNumParams()) {
+            count++;
+            candidate = OFD;
+          }
+        }
+      }
+      
+      if (candidate && count == 1) {
+        std::cout << "selected candidate:\n";
+        candidate->dump();
+        std::cout << "self:\n";
+        FD->dump();
+      }
+      if (count > 1) {
+        std::cout << "BOOO"; // TODO error message
+      }
+      
+      //
+      //OverloadCandidateSet::iterator Best;
+      //if (Candidates.BestViableFunction(Context, Loc, Best) == OR_Success)
+      //    return Best->Function;
+      
+    } else {
+      std::cout << "not found!";
     }
+  }
+    
+  //Expr *E = AL.getArgAsExpr(0);
+  //E->dump();
+  //Expr::EvalResult Result;
+  //if (E->EvaluateAsConstantExpr(Result, S.Context, Expr::ConstantExprKind::ImmediateInvocation)) {
+  //  std::cout << "EvaluateAsConstantExpr -> true\n";
+  //  if (Result.Val.isMemberPointer()) {
+  //    std::cout << "isMemberPointer\n";
+  //  } else if (Result.Val.isLValue()) {
+  //    std::cout << "isLValue\n";
+  //  }
+  //  //Result.
+  //} else {
+  //  std::cout << "EvaluateAsConstantExpr -> false\n";
+  //  
+  //}
+  //return;
+  //if (UnaryOperator * UO = dyn_cast<UnaryOperator>(E)) {
+  //  std::cout << "UnaryOperator!\n";
+  //}
+  //
+  //if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+    
+    
+    
+    
+  //  DRE->dump();
+  //  if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DRE->getDecl())) {
+  //    // check that form is same
+  //    FD->dump();
+  //    if (Attr *A = S.mergeConstevalImplementationAttr(D, FD, AL))
+  //      return D->addAttr(A);
+  //  }
+  //}
 }
 
 /// ProcessDeclAttribute - Apply the specific attribute to the specified decl if
