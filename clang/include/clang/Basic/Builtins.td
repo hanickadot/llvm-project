@@ -198,7 +198,7 @@ def FdimF128 : Builtin {
 
 def FloorF16F128 : Builtin, F16F128MathTemplate {
   let Spellings = ["__builtin_floor"];
-  let Attributes = [FunctionWithBuiltinPrefix, NoThrow, Const];
+  let Attributes = [FunctionWithBuiltinPrefix, NoThrow, Const, Constexpr];
   let Prototype = "T(T)";
 }
 
@@ -4232,7 +4232,7 @@ def Fdim : FPMathTemplate, LibBuiltin<"math.h"> {
 
 def Floor : FPMathTemplate, LibBuiltin<"math.h"> {
   let Spellings = ["floor"];
-  let Attributes = [NoThrow, Const];
+  let Attributes = [NoThrow, Const, Constexpr];
   let Prototype = "T(T)";
   let AddBuiltinPrefixedAlias = 1;
 }
