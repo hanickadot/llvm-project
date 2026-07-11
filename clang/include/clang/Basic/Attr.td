@@ -4430,7 +4430,15 @@ def ConstevalImplementation : InheritableAttr {
   let Args = [IdentifierArgument<"Implementation">];
   let Documentation = [ConstevalImplementationDocs];
   let AdditionalMembers = [{
+  protected:
     const FunctionDecl * SelectedImplementation;
+  public:
+    void setSelectedImplementation(const FunctionDecl * FD) {
+      SelectedImplementation = FD;
+    }
+    const FunctionDecl * getSelectedImplementation() const {
+      return SelectedImplementation;
+    }
   }];
 }
 

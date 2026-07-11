@@ -824,6 +824,19 @@ def warn_unreachable_association : Warning<
   "due to lvalue conversion of the controlling expression, association of type "
   "%0 will never be selected because it is %select{of array type|qualified}1">,
   InGroup<UnreachableCodeGenericAssoc>;
+  
+def warn_consteval_implementation_constructors_not_supported : Warning<
+  "attribute not supported on constructors">;
+def err_consteval_implementation_constructors_must_be_consteval : Error<
+  "alternative consteval implementation function must be consteval">;
+def err_consteval_implementation_subject_must_not_be_consteval_or_immediate : Error<
+  "subject with alternative consteval implementation must not be consteval nor immediate">;
+def err_consteval_implementation_no_name_found : Error<
+  "no alternative implementation of provided name found">;
+def err_consteval_implementation_multiple_candidates_found : Error<
+  "more than one viable alternative consteval implementation candidate found">;
+def err_consteval_implementation_no_compatible_candidate_found : Error<
+  "no viable candidate for alternative consteval implementation found">;
 
 /// Built-in functions.
 def ext_implicit_lib_function_decl : ExtWarn<
