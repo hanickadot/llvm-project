@@ -401,6 +401,31 @@ def note_constexpr_delete_base_nonvirt_dtor : Note<
 def note_constexpr_memory_leak : Note<
   "allocation performed here was not deallocated"
   "%plural{0:|: (along with %0 other memory leak%s0)}0">;
+
+def note_constexpr_lock_leak : Note<
+  "a lock of type %1 was not released"
+  "%plural{0:|: (along with %0 other locks%s0)}0">;
+def note_constexpr_read_missing_lock : Note<
+  "trying to read a value or counter from unlocked %0">;
+def note_constexpr_updating_missing_lock : Note<
+  "trying to update a value or counter from unlocked %0">;
+def note_constexpr_lock_must_not_be_acquired : Note<
+  "%0 must be unlocked before reaching destructor">;
+def note_constexpr_lock_must_be_acquired : Note<
+  "%0 is not locked">;
+def note_constexpr_lock_must_be_in_expected_state : Note<
+  "%0 is not in expected state">;
+def note_constexpr_releasing_missing_lock : Note<
+  "trying to unlock unlocked %0">;
+def note_constexpr_acquiring_already_acquired_lock : Note<
+  "trying to lock already locked %0">;
+def note_constexpr_acquiring_already_acquired_lock_in_different_state : Note<
+  "trying to differently lock already locked %0">;
+def note_constexpr_lock_must_be_in_expected_state_or_not_acquired : Note<
+  "%0 is not in expected state">;
+def note_constexpr_lock_must_be_in_expected_state_to_be_released : Note<
+  "attempt to release different type of lock from %0 than expected">;
+
 def note_constexpr_unsupported_layout : Note<
   "type %0 has unexpected layout">;
 def note_constexpr_unsupported_flexible_array : Note<

@@ -21,6 +21,7 @@
 #include <__type_traits/enable_if.h>
 #include <__type_traits/is_floating_point.h>
 #include <__utility/move.h>
+#include <__assert>
 #include <limits>
 #include <ratio>
 
@@ -89,47 +90,68 @@ inline _LIBCPP_HIDE_FROM_ABI chrono::nanoseconds __safe_nanosecond_cast(chrono::
 class _LIBCPP_EXPORTED_FROM_ABI condition_variable {
   __libcpp_condvar_t __cv_ = _LIBCPP_CONDVAR_INITIALIZER;
 
+  consteval void alt_notify_one() _NOEXCEPT {
+    // does nothing in consteval
+  }
+  consteval void alt_notify_all() _NOEXCEPT {
+    // does nothing in consteval
+  }
+  consteval void alt_wait(unique_lock<mutex>& __lk) _NOEXCEPT {
+    _LIBCPP_ASSERT(__lk.owns_lock(), "it must own the lock first");
+    __lk.unlock();
+    __lk.lock();
+    // there is no notify anyway
+  }
+  
 public:
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR condition_variable() _NOEXCEPT = default;
 
 #  if _LIBCPP_HAS_TRIVIAL_CONDVAR_DESTRUCTION
   ~condition_variable() = default;
 #  else
-  ~condition_variable();
+private:
+  consteval void alt_destructor() {}
+public:
+  _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(alt_destructor) ~condition_variable();
 #  endif
 
   condition_variable(const condition_variable&)            = delete;
   condition_variable& operator=(const condition_variable&) = delete;
 
-  void notify_one() _NOEXCEPT;
-  void notify_all() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(alt_notify_one) void notify_one() _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(alt_notify_all) void notify_all() _NOEXCEPT;
 
-  void wait(unique_lock<mutex>& __lk) _NOEXCEPT;
+  _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(alt_wait) void wait(unique_lock<mutex>& __lk) _NOEXCEPT;
 
   template <class _Predicate>
-  _LIBCPP_HIDE_FROM_ABI void wait(unique_lock<mutex>& __lk, _Predicate __pred) {
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void wait(unique_lock<mutex>& __lk, _Predicate __pred) {
     while (!__pred())
       wait(__lk);
   }
 
   template <class _Clock, class _Duration>
-  _LIBCPP_HIDE_FROM_ABI cv_status
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 cv_status
   wait_until(unique_lock<mutex>& __lk, const chrono::time_point<_Clock, _Duration>& __t) {
-    using namespace chrono;
-    using __clock_tp_ns = time_point<_Clock, nanoseconds>;
+    if consteval {
+      wait(__lk);
+      return cv_status::no_timeout;
+    } else {
+      using namespace chrono;
+      using __clock_tp_ns = time_point<_Clock, nanoseconds>;
 
-    typename _Clock::time_point __now = _Clock::now();
-    if (__t <= __now)
-      return cv_status::timeout;
+      typename _Clock::time_point __now = _Clock::now();
+      if (__t <= __now)
+        return cv_status::timeout;
 
-    __clock_tp_ns __t_ns = __clock_tp_ns(std::__safe_nanosecond_cast(__t.time_since_epoch()));
+      __clock_tp_ns __t_ns = __clock_tp_ns(std::__safe_nanosecond_cast(__t.time_since_epoch()));
 
-    __do_timed_wait(__lk, __t_ns);
-    return _Clock::now() < __t ? cv_status::no_timeout : cv_status::timeout;
+      __do_timed_wait(__lk, __t_ns);
+      return _Clock::now() < __t ? cv_status::no_timeout : cv_status::timeout;
+    }
   }
 
   template <class _Clock, class _Duration, class _Predicate>
-  _LIBCPP_HIDE_FROM_ABI bool
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   wait_until(unique_lock<mutex>& __lk, const chrono::time_point<_Clock, _Duration>& __t, _Predicate __pred) {
     while (!__pred()) {
       if (wait_until(__lk, __t) == cv_status::timeout)
@@ -139,34 +161,39 @@ public:
   }
 
   template <class _Rep, class _Period>
-  _LIBCPP_HIDE_FROM_ABI cv_status wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d) {
-    using namespace chrono;
-    if (__d <= __d.zero())
-      return cv_status::timeout;
-    using __ns_rep                   = nanoseconds::rep;
-    steady_clock::time_point __c_now = steady_clock::now();
-
-#  if _LIBCPP_HAS_COND_CLOCKWAIT
-    using __clock_tp_ns     = time_point<steady_clock, nanoseconds>;
-    __ns_rep __now_count_ns = std::__safe_nanosecond_cast(__c_now.time_since_epoch()).count();
-#  else
-    using __clock_tp_ns     = time_point<system_clock, nanoseconds>;
-    __ns_rep __now_count_ns = std::__safe_nanosecond_cast(system_clock::now().time_since_epoch()).count();
-#  endif
-
-    __ns_rep __d_ns_count = std::__safe_nanosecond_cast(__d).count();
-
-    if (__now_count_ns > numeric_limits<__ns_rep>::max() - __d_ns_count) {
-      __do_timed_wait(__lk, __clock_tp_ns::max());
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 cv_status wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d) {
+    if consteval {
+      wait(__lk);
+      return cv_status::no_timeout;
     } else {
-      __do_timed_wait(__lk, __clock_tp_ns(nanoseconds(__now_count_ns + __d_ns_count)));
-    }
+      using namespace chrono;
+      if (__d <= __d.zero())
+        return cv_status::timeout;
+      using __ns_rep                   = nanoseconds::rep;
+      steady_clock::time_point __c_now = steady_clock::now();
 
-    return steady_clock::now() - __c_now < __d ? cv_status::no_timeout : cv_status::timeout;
+  #  if _LIBCPP_HAS_COND_CLOCKWAIT
+      using __clock_tp_ns     = time_point<steady_clock, nanoseconds>;
+      __ns_rep __now_count_ns = std::__safe_nanosecond_cast(__c_now.time_since_epoch()).count();
+  #  else
+      using __clock_tp_ns     = time_point<system_clock, nanoseconds>;
+      __ns_rep __now_count_ns = std::__safe_nanosecond_cast(system_clock::now().time_since_epoch()).count();
+  #  endif
+
+      __ns_rep __d_ns_count = std::__safe_nanosecond_cast(__d).count();
+
+      if (__now_count_ns > numeric_limits<__ns_rep>::max() - __d_ns_count) {
+        __do_timed_wait(__lk, __clock_tp_ns::max());
+      } else {
+        __do_timed_wait(__lk, __clock_tp_ns(nanoseconds(__now_count_ns + __d_ns_count)));
+      }
+
+      return steady_clock::now() - __c_now < __d ? cv_status::no_timeout : cv_status::timeout;
+    }
   }
 
   template <class _Rep, class _Period, class _Predicate>
-  bool _LIBCPP_HIDE_FROM_ABI
+  bool _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29
   wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d, _Predicate __pred);
 
   typedef __libcpp_condvar_t* native_handle_type;
@@ -188,7 +215,7 @@ private:
 #if _LIBCPP_HAS_THREADS
 
 template <class _Rep, class _Period, class _Predicate>
-inline bool
+_LIBCPP_CONSTEXPR_SINCE_CXX29 inline bool
 condition_variable::wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d, _Predicate __pred) {
   return wait_until(__lk, chrono::steady_clock::now() + __d, std::move(__pred));
 }

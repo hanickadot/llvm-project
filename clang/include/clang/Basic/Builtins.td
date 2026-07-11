@@ -5926,3 +5926,68 @@ def TagPointerUnshift : Builtin {
   let Attributes = [Constexpr, NoThrow];
   let Prototype = "void*(void*, size_t)";
 }
+
+// obtain lock or fail with a nice error message
+def ConstevalLockAcquire : Builtin {
+  let Spellings = ["__builtin_consteval_lock_acquire"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*, int)";
+}
+
+// try to obtain a lock return 1 if succeed, otherwise 0
+def ConstevalLockTryAcquire : Builtin {
+  let Spellings = ["__builtin_consteval_lock_try_acquire"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "int(void*, int)";
+}
+
+// release owned lock otherwise error
+def ConstevalLockRelease : Builtin {
+  let Spellings = ["__builtin_consteval_lock_release"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*, int)";
+}
+
+
+// checks if a lock exists and returns 1/0
+def ConstevalLockExists : Builtin {
+  let Spellings = ["__builtin_consteval_lock_exists"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "int(void*)";
+}
+
+// lock must not exists otherwise a nice error message
+def ConstevalLockAssertReleased : Builtin {
+  let Spellings = ["__builtin_consteval_lock_assert_released"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*)";
+}
+
+// lock must exist and have specific value
+def ConstevalLockAssertValue : Builtin {
+  let Spellings = ["__builtin_consteval_lock_assert_value"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*, int)";
+}
+
+def ConstevalLockAssertValueOrReleased : Builtin {
+  let Spellings = ["__builtin_consteval_lock_assert_value_or_released"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*, int)";
+}
+
+// update value of lock with third parameter. only if the lock contains second value as its value
+// if lock doesn't exists fail with a message
+// return value inserted or in case of not matching the value in lock
+def ConstevalLockCompareExchange : Builtin {
+  let Spellings = ["__builtin_consteval_lock_compare_exchange"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "int(void*, int, int)";
+}
+
+// read from an existing lock otherwise fail with an error message
+def ConstevalLockRead : Builtin {
+  let Spellings = ["__builtin_consteval_lock_read"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "int(void*)";
+}
