@@ -280,9 +280,11 @@ typedef __char32_t char32_t;
 #  if _LIBCPP_STD_VER >= 26
 #    define _LIBCPP_CONSTEXPR_SINCE_CXX26 constexpr
 #    define _LIBCPP_CONSTEXPR_SINCE_CXX29 constexpr // temporary
+#    define _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(NAME) [[clang::consteval_implementation(NAME)]]
 #  else
 #    define _LIBCPP_CONSTEXPR_SINCE_CXX26
 #    define _LIBCPP_CONSTEXPR_SINCE_CXX29 // temporary
+#    define _LIBCPP_CONSTEXPR_SINCE_CXX29_IMPL(NAME)
 #  endif
       
 #  if _LIBCPP_STD_VER >= 26

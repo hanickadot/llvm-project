@@ -15,7 +15,9 @@
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 // Shared Mutex Base
-__shared_mutex_base::__shared_mutex_base() : __state_(0) {}
+[[gnu::used]] static void emit_shared_mutex_base() {
+    auto obj = __shared_mutex_base{};
+}
 
 // Exclusive ownership
 
@@ -88,7 +90,12 @@ void __shared_mutex_base::unlock_shared() {
 
 // Shared Timed Mutex
 // These routines are here for ABI stability
-shared_timed_mutex::shared_timed_mutex() : __base_() {}
+
+// Shared Mutex Base
+[[gnu::used]] static void emit_shared_timed_mutex_base() {
+    auto obj = shared_timed_mutex{};
+}
+
 void shared_timed_mutex::lock() { return __base_.lock(); }
 bool shared_timed_mutex::try_lock() { return __base_.try_lock(); }
 void shared_timed_mutex::unlock() { return __base_.unlock(); }

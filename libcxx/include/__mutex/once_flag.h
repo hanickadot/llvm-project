@@ -35,15 +35,15 @@ struct once_flag;
 #ifndef _LIBCPP_CXX03_LANG
 
 template <class _Callable, class... _Args>
-_LIBCPP_HIDE_FROM_ABI void call_once(once_flag&, _Callable&&, _Args&&...);
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag&, _Callable&&, _Args&&...);
 
 #else // _LIBCPP_CXX03_LANG
 
 template <class _Callable>
-_LIBCPP_HIDE_FROM_ABI void call_once(once_flag&, _Callable&);
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag&, _Callable&);
 
 template <class _Callable>
-_LIBCPP_HIDE_FROM_ABI void call_once(once_flag&, const _Callable&);
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag&, const _Callable&);
 
 #endif // _LIBCPP_CXX03_LANG
 
@@ -67,13 +67,13 @@ private:
 
 #ifndef _LIBCPP_CXX03_LANG
   template <class _Callable, class... _Args>
-  friend void call_once(once_flag&, _Callable&&, _Args&&...);
+  _LIBCPP_CONSTEXPR_SINCE_CXX29 friend void call_once(once_flag&, _Callable&&, _Args&&...);
 #else  // _LIBCPP_CXX03_LANG
   template <class _Callable>
-  friend void call_once(once_flag&, _Callable&);
+  _LIBCPP_CONSTEXPR_SINCE_CXX29 friend void call_once(once_flag&, _Callable&);
 
   template <class _Callable>
-  friend void call_once(once_flag&, const _Callable&);
+  _LIBCPP_CONSTEXPR_SINCE_CXX29 friend void call_once(once_flag&, const _Callable&);
 #endif // _LIBCPP_CXX03_LANG
 };
 
@@ -127,30 +127,66 @@ inline _LIBCPP_HIDE_FROM_ABI _ValueType __libcpp_acquire_load(_ValueType const* 
 #ifndef _LIBCPP_CXX03_LANG
 
 template <class _Callable, class... _Args>
-inline _LIBCPP_HIDE_FROM_ABI void call_once(once_flag& __flag, _Callable&& __func, _Args&&... __args) {
-  if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
-    typedef tuple<_Callable&&, _Args&&...> _Gp;
-    _Gp __f(std::forward<_Callable>(__func), std::forward<_Args>(__args)...);
-    __call_once_param<_Gp> __p(__f);
-    std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<_Gp>));
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag& __flag, _Callable&& __func, _Args&&... __args) {
+  if (__libcpp_is_constant_evaluated()) {
+    try {
+      if (__flag.__state_ == once_flag::_Unset) {
+        __flag.__state_ = once_flag::_Pending;
+        __func(std::forward<_Args>(__args)...);
+        __flag.__state_ = once_flag::_Complete;
+      }
+    } catch (...) {
+      __flag.__state_ = once_flag::_Unset;
+    }
+  } else {
+    if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
+      typedef tuple<_Callable&&, _Args&&...> _Gp;
+      _Gp __f(std::forward<_Callable>(__func), std::forward<_Args>(__args)...);
+      __call_once_param<_Gp> __p(__f);
+      std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<_Gp>));
+    }
   }
 }
 
 #else // _LIBCPP_CXX03_LANG
 
 template <class _Callable>
-inline _LIBCPP_HIDE_FROM_ABI void call_once(once_flag& __flag, _Callable& __func) {
-  if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
-    __call_once_param<_Callable> __p(__func);
-    std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<_Callable>));
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag& __flag, _Callable& __func) {
+  if consteval {
+    try {
+      if (__flag.__state_ == once_flag::_Unset) {
+        __flag.__state_ = once_flag::_Pending;
+        __func();
+        __flag.__state_ = once_flag::_Complete;
+      }
+    } catch (...) {
+      __flag.__state_ = once_flag::_Unset;
+    }
+  } else {
+    if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
+      __call_once_param<_Callable> __p(__func);
+      std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<_Callable>));
+    }
   }
 }
 
 template <class _Callable>
-inline _LIBCPP_HIDE_FROM_ABI void call_once(once_flag& __flag, const _Callable& __func) {
-  if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
-    __call_once_param<const _Callable> __p(__func);
-    std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<const _Callable>));
+inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void call_once(once_flag& __flag, const _Callable& __func) {
+  if consteval {
+    try {
+      if (__flag.__state_ == once_flag::_Unset) {
+        __flag.__state_ = once_flag::_Pending;
+        __func();
+        __flag.__state_ = once_flag::_Complete;
+      }
+    } catch (...) {
+      __flag.__state_ = once_flag::_Unset;
+    }
+  } else {
+    if (__libcpp_acquire_load(&__flag.__state_) != once_flag::_Complete) {
+      __call_once_param<const _Callable> __p(__func);
+      std::__call_once(__flag.__state_, std::addressof(__p), std::addressof(__call_once_proxy<const _Callable>));
+    }
   }
 }
 

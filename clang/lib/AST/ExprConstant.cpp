@@ -69,6 +69,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <iostream>
 
 #define DEBUG_TYPE "exprconstant"
 
@@ -531,6 +532,9 @@ namespace {
 
     /// Index - The call index of this call.
     unsigned Index;
+    
+    /// Hide this frame in callstack
+    bool HideFrame{false};
 
     /// The stack of integers for tracking version numbers for temporaries.
     SmallVector<unsigned, 2> TempVersionStack = {1};
@@ -855,6 +859,14 @@ namespace {
 
     /// The number of heap allocations performed so far in this evaluation.
     unsigned NumHeapAllocs = 0;
+    
+    /// Locks
+    struct LockInfo {
+      APSInt value;
+      const Expr * expr;
+      const Expr * caller;
+    };
+    std::map<LValue, LockInfo> ActiveLocks;
 
     struct EvaluatingConstructorRAII {
       EvalInfo &EI;
@@ -1608,6 +1620,9 @@ namespace {
       if (N.getQuantity())
         clearIsNullPointer();
     }
+    friend bool operator<(const LValue & lhs, const LValue & rhs) noexcept {
+      return std::pair{lhs.Base.getOpaqueValue(), lhs.Offset} < std::pair{rhs.Base.getOpaqueValue(), rhs.Offset};
+    }
   };
 
   struct MemberPtr {
@@ -1864,6 +1879,10 @@ void CallStackFrame::describe(raw_ostream &Out) const {
   bool ExplicitInstanceParam = false;
   clang::PrintingPolicy PrintingPolicy = Info.Ctx.getPrintingPolicy();
   PrintingPolicy.SuppressLambdaBody = true;
+  
+  if (HideFrame) {
+    return;
+  }
 
   if (const auto *MD = dyn_cast<CXXMethodDecl>(Callee)) {
     IsMemberCall = !isa<CXXConstructorDecl>(MD) && !MD->isStatic();
@@ -2555,6 +2574,23 @@ static bool CheckMemoryLeaks(EvalInfo &Info) {
     Info.CCEDiag(Info.HeapAllocs.begin()->second.AllocExpr,
                  diag::note_constexpr_memory_leak)
         << unsigned(Info.HeapAllocs.size() - 1);
+  }
+  return true;
+}
+
+static bool CheckLocksLeaks(EvalInfo &Info) {
+  if (!Info.ActiveLocks.empty()) {
+    // We can still fold to a constant despite a compile-time memory leak,
+    // so long as the heap allocation isn't referenced in the result (we check
+    // that in CheckConstantExpression).
+    const auto first_lock = Info.ActiveLocks.begin()->second;
+    auto Type = first_lock.expr->getType();
+    if (Type->isPointerType()) {
+      Type = Type->getPointeeType();
+    }
+    Info.CCEDiag(first_lock.caller,
+                 diag::note_constexpr_lock_leak)
+        << unsigned(Info.ActiveLocks.size() - 1) << Type;
   }
   return true;
 }
@@ -16383,6 +16419,63 @@ static bool getBuiltinAlignArguments(const CallExpr *E, EvalInfo &Info,
   return true;
 }
 
+struct LockAccessT {
+  bool ok;
+  decltype(EvalInfo::ActiveLocks)::iterator iterator{};
+  LValue lvalue{};
+  const Expr * Arg0{nullptr}; // striped the cast to void *
+  const Expr * Caller{nullptr}; // for nice error messages :)
+};
+
+static LockAccessT accessLock(EvalInfo & Info, const CallExpr *E) {
+  LValue Result;
+  
+  if (!EvaluatePointer(E->getArg(0), Result, Info, false))
+    return LockAccessT{false}; // I'm not using optional, as I want structured bindings
+  
+  auto it = Info.ActiveLocks.find(Result);
+  
+  const Expr * Caller = E;
+  if (Info.CurrentCall->isStdFunction() && Info.CurrentCall->CallExpr) {
+    Caller = Info.CurrentCall->CallExpr;
+  }
+  
+  const Expr * Arg0 = E->getArg(0);
+  if (const CastExpr * CE = dyn_cast<CastExpr>(Arg0)) {
+    Arg0 = CE->getSubExpr();
+  }
+  
+  return LockAccessT{true, it, std::move(Result), Arg0, Caller};
+}
+
+static bool EmitLockError(EvalInfo & Info, const CallExpr * E, diag::kind DiagId) {
+  const Expr * Arg0 = E->getArg(0);
+  if (const CastExpr * CE = dyn_cast<CastExpr>(Arg0)) {
+    Arg0 = CE->getSubExpr();
+  }
+  
+  QualType type = Arg0->getType();
+  if (type->isPointerType()) {
+    type = type->getPointeeType();
+  }
+  
+  CallStackFrame * Frame = Info.CurrentCall;
+  SourceRange CallRange = Frame->getCallRange();
+  
+  while (Frame) {
+    if (Frame->isStdFunction()) {
+      CallRange = Frame->getCallRange();
+      Frame->HideFrame = true;
+      Frame = Frame->Caller;
+    } else {
+      break;
+    }
+  }
+  
+  Info.FFDiag(CallRange.getBegin(), DiagId) << type << CallRange;
+  return false;
+}
+
 bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
                                             unsigned BuiltinOp) {
   auto EvalTestOp = [&](llvm::function_ref<bool(const APInt &, const APInt &)>
@@ -16471,6 +16564,64 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case X86::BI__builtin_ia32_crc32di:
     return HandleCRC32(8);
 
+  
+  case Builtin::BI__builtin_consteval_lock_try_acquire: {
+    auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+    if (!ok) return Error(E);
+    
+    APSInt Value;
+    if (!EvaluateInteger(E->getArg(1), Value, Info))
+      return false;
+    
+    if (it != Info.ActiveLocks.end()) { // if it already exists, return 0
+      // existing one
+      return Success(0, E);
+    }
+    
+    Info.ActiveLocks.emplace(lv, EvalInfo::LockInfo{Value, arg0, caller});
+    return Success(1, E);
+  }
+  case Builtin::BI__builtin_consteval_lock_exists: {
+    auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+    if (!ok) return Error(E);
+    
+    return Success(it != Info.ActiveLocks.end(), E);
+  }
+  case Builtin::BI__builtin_consteval_lock_read: {
+    auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+    if (!ok) return Error(E);
+    
+    if (it == Info.ActiveLocks.end()) {
+      return EmitLockError(Info, E, diag::note_constexpr_read_missing_lock);
+    }
+    
+    // return value or fail
+    return Success(it->second.value, E);
+  }
+  case Builtin::BI__builtin_consteval_lock_compare_exchange: {
+    auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+    if (!ok) return Error(E);
+    
+    APSInt Expected;
+    if (!EvaluateInteger(E->getArg(1), Expected, Info))
+      return false;
+    
+    APSInt Value;
+    if (!EvaluateInteger(E->getArg(2), Value, Info))
+      return false;
+    
+    if (it == Info.ActiveLocks.end()) {
+      return EmitLockError(Info, E, diag::note_constexpr_updating_missing_lock);
+    }
+    
+    if (it->second.value == Expected) {
+      it->second.value = Value;
+      return Success(Value, E);
+    } else {
+      return Success(it->second.value, E);
+    }
+  }
+    
   case Builtin::BI__builtin_pointers_related: {
     LValue First, Second;
     
@@ -21145,6 +21296,85 @@ public:
     case Builtin::BI__builtin_assume:
       // The argument is not evaluated!
       return true;
+    case Builtin::BI__builtin_consteval_lock_assert_released: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      
+      if (it != Info.ActiveLocks.end()) {
+        return EmitLockError(Info, E, diag::note_constexpr_lock_must_not_be_acquired);
+      }
+      return true;
+    }
+    case Builtin::BI__builtin_consteval_lock_assert_value_or_released: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      
+      APSInt Value;
+      if (!EvaluateInteger(E->getArg(1), Value, Info))
+        return false;
+      
+      if (it != Info.ActiveLocks.end() && it->second.value != Value) {
+        return EmitLockError(Info, E, diag::note_constexpr_lock_must_be_in_expected_state_or_not_acquired);
+      }
+      
+      return true;
+    }
+    case Builtin::BI__builtin_consteval_lock_assert_value: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      
+      APSInt Value;
+      if (!EvaluateInteger(E->getArg(1), Value, Info))
+        return false;
+      
+      if (it == Info.ActiveLocks.end()) {
+        return EmitLockError(Info, E, diag::note_constexpr_lock_must_be_acquired);
+      }
+      
+      if (it->second.value != Value) {
+        return EmitLockError(Info, E, diag::note_constexpr_lock_must_be_in_expected_state);
+      }
+      
+      return true;
+    }
+    case Builtin::BI__builtin_consteval_lock_release: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      
+      APSInt Value;
+      if (!EvaluateInteger(E->getArg(1), Value, Info))
+        return false;
+      
+      if (it == Info.ActiveLocks.end()) {
+        return EmitLockError(Info, E, diag::note_constexpr_releasing_missing_lock);
+      }
+      
+      if (it->second.value != Value) {
+        return EmitLockError(Info, E, diag::note_constexpr_lock_must_be_in_expected_state_to_be_released);
+      }
+      
+      Info.ActiveLocks.erase(it);
+      return true;
+    }
+    case Builtin::BI__builtin_consteval_lock_acquire: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      
+      APSInt Value;
+      if (!EvaluateInteger(E->getArg(1), Value, Info))
+        return false;
+      
+      if (it != Info.ActiveLocks.end()) { // already exists => deadlock or UB
+        if (it->second.value != Value) {
+          return EmitLockError(Info, E, diag::note_constexpr_acquiring_already_acquired_lock_in_different_state);
+        }
+        return EmitLockError(Info, E, diag::note_constexpr_acquiring_already_acquired_lock);
+      }
+      
+      Info.ActiveLocks.emplace(lv, EvalInfo::LockInfo{Value, arg0, caller});
+      return true;
+    }
+    
 
     case Builtin::BI__builtin_operator_delete:
       return HandleOperatorDeleteCall(Info, E);
@@ -21396,7 +21626,7 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   // Check this core constant expression is a constant expression.
   return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
                                  ConstantExprKind::Normal) &&
-         CheckMemoryLeaks(Info);
+         CheckMemoryLeaks(Info) && CheckLocksLeaks(Info);
 }
 
 static bool FastEvaluateAsRValue(const Expr *Exp, APValue &Result,
@@ -21678,6 +21908,8 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
     return false;
   if (!CheckMemoryLeaks(Info))
     return false;
+  if (!CheckLocksLeaks(Info))
+    return false;
 
   // If this is a class template argument, it's required to have constant
   // destruction too.
@@ -21760,7 +21992,7 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
 
   return CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
                                  ConstantExprKind::Normal) &&
-         CheckMemoryLeaks(Info);
+         CheckMemoryLeaks(Info) && CheckLocksLeaks(Info);
 }
 
 bool VarDecl::evaluateDestruction(
@@ -22745,7 +22977,7 @@ static bool EvaluateCharRangeAsStringImpl(const Expr *, T &Result,
       return false;
   }
 
-  return Scope.destroy() && CheckMemoryLeaks(Info);
+  return Scope.destroy() && CheckMemoryLeaks(Info) && CheckLocksLeaks(Info);
 }
 
 bool Expr::EvaluateCharRangeAsString(std::string &Result,
