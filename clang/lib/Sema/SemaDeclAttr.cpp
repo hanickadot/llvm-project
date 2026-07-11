@@ -7456,121 +7456,143 @@ static void handlePersonalityAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
       << AL.getAttrName();
 }
 
-ConstevalImplementationAttr *Sema::mergeConstevalImplementationAttr(Decl *D, FunctionDecl *Alternative,
-                                            const AttributeCommonInfo &CI) {
+ConstevalImplementationAttr *Sema::mergeConstevalImplementationAttr(Decl *D, const FunctionDecl * Selected,  const AttributeCommonInfo &CI) {
   if (ConstevalImplementationAttr *CImpl = D->getAttr<ConstevalImplementationAttr>()) {
-    //const FunctionDecl *Implementation = CImpl->getImplementation();
-    //if (Context.isSameEntity(Implementation, Alternative))
-    //  return nullptr;
-    //Diag(CImpl->getLocation(), diag::err_mismatched_constaval_implementation); 
-    //Diag(CI.getLoc(), diag::note_previous_attribute);
-    //D->dropAttr<ConstevalImplementationAttr>();
+    const FunctionDecl *Implementation = CImpl->getSelectedImplementation();
+    if (Context.isSameEntity(Implementation, Selected))
+      return nullptr;
+    Diag(CImpl->getLocation(), diag::err_mismatched_constaval_implementation); 
+    Diag(CI.getLoc(), diag::note_previous_attribute);
+    D->dropAttr<ConstevalImplementationAttr>();
   }
-  return ::new (Context) ConstevalImplementationAttr(Context, CI, nullptr);
+  ConstevalImplementationAttr *Attr = ::new (Context) ConstevalImplementationAttr(Context, CI, nullptr);
+  Attr->setSelectedImplementation(Selected);
+  D->addAttr(Attr);
+  return Attr;
 }
 
-template <typename> struct identify;
-
 static void handleConstevalImplementationAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
+  // TODO handle instantiation
   if (!AL.isArgIdent(0)) {
-    return; // TODO error message
+    return;
   }
   IdentifierLoc *ILoc = AL.getArgAsIdent(0);
   if (!ILoc) {
     return;
   }
   IdentifierInfo *II = ILoc->getIdentifierInfo();
-  std::cout << std::string_view{II->getName()} << "\n";
-    
-  if (const FunctionDecl * FD = dyn_cast<FunctionDecl>(D)) {
-    const CXXMethodDecl * MD = dyn_cast<CXXMethodDecl>(D);
-    std::cout << "is a function decl\n";
-    
-    DeclContext *DC = D->getDeclContext();
-    
-    LookupResult R(S, II, SourceLocation(), Sema::LookupOrdinaryName);
-
-    if (S.LookupQualifiedName(R, DC)) {
-      
-      std::cout << "found something!";
-      
-      const FunctionDecl * candidate = nullptr;
-      size_t count = 0;
-      
-      for (const clang::NamedDecl * x: R) {
-        std::cout << "iterating:\n";
-        x->dump();
-        const FunctionDecl * OFD = dyn_cast<FunctionDecl>(x);
-        if (OFD->isImmediateFunction()) {
-          const CXXMethodDecl * method = dyn_cast<CXXMethodDecl>(x);
-          if (method) {
-            if (!MD) {
-              continue;
-            }
-            if (method->getThisType() != MD->getThisType()) {
-              continue;
-            }
-          }
-          if (FD->getNumParams() == OFD->getNumParams()) {
-            count++;
-            candidate = OFD;
-          }
-        }
-      }
-      
-      if (candidate && count == 1) {
-        std::cout << "selected candidate:\n";
-        candidate->dump();
-        std::cout << "self:\n";
-        FD->dump();
-      }
-      if (count > 1) {
-        std::cout << "BOOO"; // TODO error message
-      }
-      
-      //
-      //OverloadCandidateSet::iterator Best;
-      //if (Candidates.BestViableFunction(Context, Loc, Best) == OR_Success)
-      //    return Best->Function;
-      
-    } else {
-      std::cout << "not found!";
-    }
+  
+  const FunctionDecl * FD = dyn_cast<FunctionDecl>(D);
+  assert(FD && "constevalimplementation attribute works only on function declarations");
+  
+  // err_consteval_implementation_subject_must_not_be_consteval_or_immediate
+  
+  const CXXMethodDecl * MD = dyn_cast<CXXMethodDecl>(D);
+  const CXXConstructorDecl * CD = dyn_cast<CXXConstructorDecl>(D);
+  
+  if (CD) {
+    S.Diag(AL.getLoc(), diag::warn_consteval_implementation_constructors_not_supported) << D->getSourceRange();
+    return;
+  }
+  
+  if (FD->isImmediateFunction()) {
+    S.Diag(AL.getLoc(), diag::err_consteval_implementation_subject_must_not_be_consteval_or_immediate) << D->getSourceRange();
+    return;
+  }
+  
+  const CXXDestructorDecl * DD = dyn_cast<CXXDestructorDecl>(D);
+  
+  LookupResult R(S, II, SourceLocation(), Sema::LookupOrdinaryName);
+  DeclContext *DC = D->getDeclContext();
+  
+  if (!S.LookupQualifiedName(R, DC)) {
+    S.Diag(ILoc->getLoc(), diag::err_consteval_implementation_no_name_found);
+    return;
   }
     
-  //Expr *E = AL.getArgAsExpr(0);
-  //E->dump();
-  //Expr::EvalResult Result;
-  //if (E->EvaluateAsConstantExpr(Result, S.Context, Expr::ConstantExprKind::ImmediateInvocation)) {
-  //  std::cout << "EvaluateAsConstantExpr -> true\n";
-  //  if (Result.Val.isMemberPointer()) {
-  //    std::cout << "isMemberPointer\n";
-  //  } else if (Result.Val.isLValue()) {
-  //    std::cout << "isLValue\n";
-  //  }
-  //  //Result.
-  //} else {
-  //  std::cout << "EvaluateAsConstantExpr -> false\n";
-  //  
-  //}
-  //return;
-  //if (UnaryOperator * UO = dyn_cast<UnaryOperator>(E)) {
-  //  std::cout << "UnaryOperator!\n";
-  //}
-  //
-  //if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  const auto *FPT = FD->getType()->getAs<clang::FunctionProtoType>();
+  if (!FPT) {
+    return;
+  }
+  
+  auto CheckCompatible = [&](const FunctionDecl * Candidate) {
+    if (!Candidate->isImmediateFunction()) {
+      return false;
+    }
     
+    const CXXMethodDecl * CandidateMethod = dyn_cast<CXXMethodDecl>(Candidate);
     
+    if (DD) { // subject is destructor
+      if (!CandidateMethod) {
+        // Candidate must be CXXMethodDecl
+        return false;
+      }
+      if (!CandidateMethod->getReturnType()->isVoidType()) {
+        // and must return void
+        return false;
+      }
+    } else {
+      // non destructors must return same type!
+      if (FD->getReturnType().getCanonicalType() != Candidate->getReturnType().getCanonicalType()) {
+        return false;
+      }
+    }
     
+    if (MD) { // subject is a member method
+      if (!CandidateMethod) {
+        // Candidate must be CXXMethodDecl
+        return false;;
+      }
+      if (CandidateMethod->getThisType().getCanonicalType() != MD->getThisType().getCanonicalType()) {
+        // And must return same type
+        return false;
+      }
+    }
     
-  //  DRE->dump();
-  //  if (FunctionDecl *FD = dyn_cast<FunctionDecl>(DRE->getDecl())) {
-  //    // check that form is same
-  //    FD->dump();
-  //    if (Attr *A = S.mergeConstevalImplementationAttr(D, FD, AL))
-  //      return D->addAttr(A);
-  //  }
-  //}
+    // they must have same number of methods
+    if (FD->getNumParams() != Candidate->getNumParams()) {
+      return false;
+    }
+    
+    // and they must be identical
+    for (unsigned i = 0; i != FD->getNumParams(); ++i) {
+      if (FD->getParamDecl(i)->getType().getCanonicalType() != Candidate->getParamDecl(i)->getType().getCanonicalType()) {
+        return false;
+      }
+    }
+    
+    const auto * CandidateFunctionType = Candidate->getType()->getAs<clang::FunctionProtoType>();
+    if (!CandidateFunctionType) {
+      return false;
+    }
+    
+    if (FPT->hasNoexceptExceptionSpec()) {
+      if (!CandidateFunctionType->hasNoexceptExceptionSpec()) {
+        return false;
+      }
+    }
+    return true;
+  };
+  
+  const FunctionDecl * selected = nullptr;
+ 
+  for (const clang::NamedDecl * CandidateNamedDecl: R) {
+    const FunctionDecl * Candidate = dyn_cast<FunctionDecl>(CandidateNamedDecl);
+    if (CheckCompatible(Candidate)) {
+      if (selected) {
+        // multiple candidates
+        S.Diag(AL.getLoc(), diag::err_consteval_implementation_multiple_candidates_found);
+        return;
+      }
+      selected = Candidate;
+    }
+  }
+  
+  if (selected) {
+    S.mergeConstevalImplementationAttr(D, selected, AL);
+  } else {
+    S.Diag(AL.getLoc(), diag::err_consteval_implementation_no_compatible_candidate_found);
+  }
 }
 
 /// ProcessDeclAttribute - Apply the specific attribute to the specified decl if

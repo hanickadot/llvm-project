@@ -3307,11 +3307,11 @@ Stmt *FunctionDecl::getBody(const FunctionDecl *&Definition) const {
 Stmt *FunctionDecl::getConstevalBody(const FunctionDecl *&Definition) const {
   auto * CIA = this->getAttr<clang::ConstevalImplementationAttr>();
   if (CIA) {
-    //auto * CI = CIA->getImplementation();
-    //if (CI) {
-    //  Definition = CI;
-    //  return Definition->getBody(Definition);
-    //}
+    auto * CI = CIA->getSelectedImplementation();
+    if (CI) {
+      Definition = CI;
+      return Definition->getBody(Definition);
+    }
   }
   
   return getBody(Definition);
