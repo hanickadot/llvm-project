@@ -423,6 +423,8 @@ def note_constexpr_acquiring_already_acquired_lock_in_different_state : Note<
   "trying to differently lock already locked %0">;
 def note_constexpr_lock_must_be_in_expected_state_or_not_acquired : Note<
   "%0 is not in expected state">;
+def note_constexpr_no_forward_progress : Note<
+  "can't do any forward progress, blocked by %0">;
 def note_constexpr_lock_must_be_in_expected_state_to_be_released : Note<
   "attempt to release different type of lock from %0 than expected">;
 

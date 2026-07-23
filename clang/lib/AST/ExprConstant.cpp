@@ -21305,6 +21305,11 @@ public:
       }
       return true;
     }
+    case Builtin::BI__builtin_consteval_report_deadlock: {
+      auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
+      if (!ok) return Error(E);
+      return EmitLockError(Info, E, diag::note_constexpr_no_forward_progress);
+    }
     case Builtin::BI__builtin_consteval_lock_assert_value_or_released: {
       auto [ok, it, lv, arg0, caller] = accessLock(Info, E);
       if (!ok) return Error(E);

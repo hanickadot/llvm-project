@@ -5991,3 +5991,9 @@ def ConstevalLockRead : Builtin {
   let Attributes = [Consteval, NoThrow];
   let Prototype = "int(void*)";
 }
+
+def ConstevalLockReportDeadlock : Builtin {
+  let Spellings = ["__builtin_consteval_report_deadlock"];
+  let Attributes = [Consteval, NoThrow];
+  let Prototype = "void(void*)";
+}

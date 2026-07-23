@@ -97,9 +97,8 @@ class _LIBCPP_EXPORTED_FROM_ABI condition_variable {
     // does nothing in consteval
   }
   consteval void alt_wait(unique_lock<mutex>& __lk) _NOEXCEPT {
-    _LIBCPP_ASSERT(__lk.owns_lock(), "it must own the lock first");
-    __lk.unlock();
-    __lk.lock();
+    __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+    __builtin_consteval_report_deadlock(this);
     // there is no notify anyway
   }
   
@@ -125,6 +124,9 @@ public:
 
   template <class _Predicate>
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 void wait(unique_lock<mutex>& __lk, _Predicate __pred) {
+    if consteval {
+      __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+    }
     while (!__pred())
       wait(__lk);
   }
@@ -133,8 +135,8 @@ public:
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 cv_status
   wait_until(unique_lock<mutex>& __lk, const chrono::time_point<_Clock, _Duration>& __t) {
     if consteval {
-      wait(__lk);
-      return cv_status::no_timeout;
+      __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+      return cv_status::timeout; // there is no time like compile-time => fast forward
     } else {
       using namespace chrono;
       using __clock_tp_ns = time_point<_Clock, nanoseconds>;
@@ -153,6 +155,9 @@ public:
   template <class _Clock, class _Duration, class _Predicate>
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 bool
   wait_until(unique_lock<mutex>& __lk, const chrono::time_point<_Clock, _Duration>& __t, _Predicate __pred) {
+    if consteval {
+      __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+    }
     while (!__pred()) {
       if (wait_until(__lk, __t) == cv_status::timeout)
         return __pred();
@@ -163,8 +168,8 @@ public:
   template <class _Rep, class _Period>
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX29 cv_status wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d) {
     if consteval {
-      wait(__lk);
-      return cv_status::no_timeout;
+      __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+      return cv_status::timeout; // there is no time like compile-time => fast forward
     } else {
       using namespace chrono;
       if (__d <= __d.zero())
@@ -217,7 +222,14 @@ private:
 template <class _Rep, class _Period, class _Predicate>
 _LIBCPP_CONSTEXPR_SINCE_CXX29 inline bool
 condition_variable::wait_for(unique_lock<mutex>& __lk, const chrono::duration<_Rep, _Period>& __d, _Predicate __pred) {
-  return wait_until(__lk, chrono::steady_clock::now() + __d, std::move(__pred));
+  if consteval {
+    __builtin_consteval_lock_assert_value(__lk.mutex(), 1);
+    // there is no time like compile-time => fast forward
+    if (__pred()) return true;
+    else return __pred();
+  } else {
+    return wait_until(__lk, chrono::steady_clock::now() + __d, std::move(__pred));
+  }
 }
 
 #  if _LIBCPP_HAS_COND_CLOCKWAIT
