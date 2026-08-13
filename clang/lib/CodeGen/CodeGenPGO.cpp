@@ -958,7 +958,16 @@ void CodeGenPGO::assignRegionCounters(GlobalDecl GD, llvm::Function *Fn) {
       SM.isInSystemHeader(D->getLocation()))
     return;
 
-  setFuncName(Fn);
+  
+  if (const auto *CCD = dyn_cast<CXXConstructorDecl>(D)) {
+    // on some platforms this can still be reached and getCtorType() != Ctor_Base
+    // Instead of using pointer thingy, we can pass name and declaration instead
+    GlobalDecl C2(CCD, Ctor_Base);
+    setFuncName(CGM.getMangledName(C2), CGM.getFunctionLinkage(GD));
+  } else {
+    setFuncName(Fn);
+  }
+  
 
   mapRegionCounters(D);
   if (CGM.getCodeGenOpts().CoverageMapping)
